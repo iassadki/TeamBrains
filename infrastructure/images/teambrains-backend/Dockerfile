@@ -10,10 +10,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install Flask
 RUN pip install flask-cors
 RUN pip install Flask-SQLAlchemy
-# RUN pip install Flask-Migrate
 RUN pip install psycopg2-binary
+RUN pip install PyJWT
+RUN pip install python-dotenv
+RUN pip install Flask-Bcrypt
+RUN pip install flask-jwt-extended
 
+
+COPY /infrastructure/images/teambrains-backend/.env .
 COPY src/servers/teambrains-backend/ .
+
+RUN chmod +x /app/postgres.sh
+
 
 EXPOSE 5001
 

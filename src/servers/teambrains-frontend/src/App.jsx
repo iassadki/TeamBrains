@@ -6,14 +6,17 @@ import HomeContent from './components/HomeContent';
 import Footer from './components/Footer';
 import SignUp from './components/SignUp/Signup';
 import SignIn from './components/SignIn';
+import Profile from './components/Profile';
+import { AuthProvider } from './context/AuthContext';
+import PrivateRoute from './components/PrivateRoute';
 
 const App = () => {
     return (
         <Router>
-            <div>
+            <AuthProvider>
+            <div className="flex flex-col min-h-screen">
                 <NavBar />
-                <div className="flex flex-col min-h-screen pt-[5rem]">
-                    <div className="flex-grow">
+                <main className="flex-grow mt-[5rem]" style={{ minHeight: `calc(100vh - 80px)` }}>
                         <Routes>
                             <Route path="/" element={
                                 <div>
@@ -23,11 +26,12 @@ const App = () => {
                             } />
                             <Route path="/inscription" element={<SignUp />} />
                             <Route path="/connexion" element={<SignIn />} />
+                            <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>}/>
                         </Routes>
-                    </div>
-                </div>
+                </main>
                 <Footer />
             </div>
+            </AuthProvider>
         </Router>
     );
 };

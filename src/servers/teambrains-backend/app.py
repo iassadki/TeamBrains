@@ -1,17 +1,33 @@
 from flask import Flask
 from flask_cors import CORS
 import logging
-from models import db, User  # Importez db ici aussi
+from models import db, User
 from routes.auth import auth
+from routes.users import users
+from dotenv import load_dotenv
+import os
+from extensions import bcrypt
+from flask_jwt_extended import JWTManager
 
+load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])
+bcrypt.init_app(app)
+#CORS(app, supports_credentials=True, origins=["http://localhost:5173/"])
+
+
 app.register_blueprint(auth, url_prefix='/auth')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://teambrains:teambrains@database/teambrains'
+app.register_blueprint(users, url_prefix='/users')
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
+app.config['JWT_SECRET_KEY'] = 'wdgQWWUKwT17lCz1'
 
 db.init_app(app)
+
+jwt = JWTManager(app)
+
+CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}}, supports_credentials=True)
 
 with app.app_context():
     db.create_all()

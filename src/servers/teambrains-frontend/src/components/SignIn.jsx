@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-const SignIn = ({ onSignIn }) => {
+const SignIn = ({ onSuccessfulLogin }) => {
+    const { login } = useAuth();
+    const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
@@ -16,13 +20,34 @@ const SignIn = ({ onSignIn }) => {
             setErrorMessage('Veuillez entrer une adresse email valide.');
         } else {
             setErrorMessage('');
-            console.log(email, password);
-            // onSignIn(email, password);
+            fetch('http://localhost:5001/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data) {
+                    login(data.accessToken);
+                    onSuccessfulLogin();
+                    // localStorage.setItem('idUser', data.id)
+                    // localStorage.setItem('emailUser', data.email)
+                    navigate('/');
+                } else {
+                    setErrorMessage(data.message || 'Une erreur est survenue.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                setErrorMessage('Une erreur est survenue lors de la connexion.');
+            });
         }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="my-32 mx-auto flex w-full max-w-lg flex-col rounded-xl border border-border bg-backgroundSecondary p-4 sm:p-20">
+        <form onSubmit={handleSubmit} className="m-auto w-full max-w-lg p-4 sm:p-20">
         <div className="flex w-full max-w-sm flex-col gap-6">
             <div className="flex flex-col items-center">
                 <h1 className="text-3xl font-semibold">Connexion</h1>
