@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
 import SignIn from './SignIn';
 import SignUp from './Signup/Signup';
+import { useNavigate } from 'react-router-dom';
 
 const NavBar = () => {
 
@@ -15,6 +16,7 @@ const NavBar = () => {
 
     const { currentUser, logout } = useAuth();
     const dropdownRef = useRef(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
         console.log(currentUser)
@@ -32,7 +34,8 @@ const NavBar = () => {
 
       const handleLogout = () => {
         logout();
-        setIsDropdownOpen(false); // Ferme le menu dropdown
+        setIsDropdownOpen(false);
+        navigate('/');
     };
 
     return (
