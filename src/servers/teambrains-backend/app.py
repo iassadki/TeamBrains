@@ -1,9 +1,10 @@
 from flask import Flask
 from flask_cors import CORS
 import logging
-from models import db, User
+from models import db, User, Project
 from routes.auth import auth
 from routes.users import users
+from routes.projects import projects
 from dotenv import load_dotenv
 import os
 from extensions import bcrypt
@@ -19,6 +20,7 @@ bcrypt.init_app(app)
 
 app.register_blueprint(auth, url_prefix='/auth')
 app.register_blueprint(users, url_prefix='/users')
+app.register_blueprint(projects, url_prefix='/projects')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['JWT_SECRET_KEY'] = 'wdgQWWUKwT17lCz1'

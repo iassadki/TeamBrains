@@ -5,6 +5,7 @@ RUN npm i
 RUN npm install rippleui
 RUN npm install axios
 RUN npm update esbuild
+RUN npm install react-datepicker
 
 COPY src/servers/teambrains-frontend/ .
 EXPOSE 5173

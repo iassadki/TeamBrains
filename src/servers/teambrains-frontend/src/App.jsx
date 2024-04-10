@@ -9,6 +9,8 @@ import SignIn from './components/SignIn';
 import Profile from './components/Profile';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import Projects from './components/Projects';
+import CreateProject from './components/CreateProject';
 
 const App = () => {
     return (
@@ -27,6 +29,8 @@ const App = () => {
                             <Route path="/inscription" element={<SignUp />} />
                             <Route path="/connexion" element={<SignIn />} />
                             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>}/>
+                            <Route path="/projets" element={<Projects/>}/>
+                            <Route path="/projets/nouveau-projet" element={<PrivateRoute><CreateProject /></PrivateRoute>} />
                         </Routes>
                 </main>
                 <Footer />
