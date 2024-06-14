@@ -1,13 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { NavLink } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
+
 
 const Projects = () => {
+    
     const [projects, setProjects] = useState([]);
     const [isExpandedProfile, setIsExpandedProfile] = useState(true);
     const [isExpandedLangage, setIsExpandedLangage] = useState(true);
+    const [sortOrder, setSortOrder] = useState('newest');
+    const navigate = useNavigate();
+
+    const sortedProjects = projects.sort((a, b) => {
+        if (sortOrder === 'newest') {
+            return new Date(b.creation_date) - new Date(a.creation_date);
+        } else {
+            return new Date(a.creation_date) - new Date(b.creation_date);
+        }
+    });
+
+    const handleProjectClick = (slug) => {
+        navigate(`/projets/${slug}`);
+    };
 
     const toggleExpandedProfile = () => {
         setIsExpandedProfile(!isExpandedProfile);
@@ -16,6 +35,29 @@ const Projects = () => {
     const toggleExpandedLangage = () => {
         setIsExpandedLangage(!isExpandedLangage);
     };
+
+    const mapRolesToMembers = (members) => {
+        const roles = {
+            'FullStack': 'Disponible',
+            'Backend': 'Disponible',
+            'Frontend': 'Disponible',
+            'Designer': 'Disponible'
+        };
+    
+        if (members) {
+            members.forEach(member => {
+                const cleanedRole = member.role.replace(/['"\\]+/g, ''); // Supprime les guillemets et les caractères d'échappement
+                if (roles.hasOwnProperty(cleanedRole)) {
+                    roles[cleanedRole] = member.name;
+                }
+            });
+        }
+        
+        return roles;
+    };
+    
+    
+    
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -26,6 +68,7 @@ const Projects = () => {
                     },
                 });
                 setProjects(response.data);
+                console.log(response.data)
             } catch (error) {
                 console.error("Erreur lors de la récupération des projets", error);
             }
@@ -34,11 +77,16 @@ const Projects = () => {
         fetchProjects();
     }, []);
 
+    const formatDate = (isoDate) => {
+        const date = parseISO(isoDate);
+        let formattedDate = format(date, "d MMMM yyyy", { locale: fr });
+        return formattedDate.replace(/^(.)|\s+(.)/g, c => c.toUpperCase());  // Capitalise chaque mot
+    };
+    
+    
     return (
         <div className="mx-12 p-12 flex">
-            {/* Colonne de filtres avec position sticky */}
             <div className="w-1/4 h-screen overflow-auto sticky top-0 mr-4">
-                {/* Votre contenu de filtrage ici */}
                 <div className='flex'>
                     <SlidersHorizontal />
                     <h2 className="ml-2 text-xl font-semibold mb-4">Filtres</h2>
@@ -89,7 +137,6 @@ const Projects = () => {
             
                     {isExpandedLangage && (
                         <div>
-                            {/* Liste des cases à cocher ici */}
                             <label className="block mb-2">
                                 <input type="checkbox" className="mr-2" />
                                 Javascript
@@ -111,7 +158,6 @@ const Projects = () => {
                 </div>
             </div>
 
-            {/* Colonne principale pour le contenu des projets */}
             <div className="w-3/4 ml-8">
                 <div className="mb-8 flex">
                     <div>
@@ -120,28 +166,57 @@ const Projects = () => {
                     </div>
                     
                     <div>
-                    <NavLink to="/projets/nouveau-projet" className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 mt-4 inline-block">
+                    <NavLink to="/projets/nouveau-projet" className="bg-green-500 text-white py-2 px-8 rounded hover:bg-green-600 mt-4 inline-block">
                         Créer un projet
                     </NavLink>
                     </div>
                     
                 </div>
+                
+                <div className='flex justify-between mb-2'>
+                    <p><span className='font-semibold text-green-tb'>{projects.length}</span> <span className='font-light'>projets</span></p>
+                    <div>
+                        <label className="mr-1" htmlFor="sortOrder">Trier par </label>
+                        <select className='border rounded-lg p-1' id="sortOrder" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
+                            <option value="newest">Le plus récent</option>
+                            <option value="oldest">Le plus ancien</option>
+                        </select>
+                    </div>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {projects.map((project) => (
-        <div
-            key={project.id}
-            className="bg-white rounded-lg shadow p-5 transition duration-300 ease-in-out hover:shadow-lg hover:border-2 hover:border-green-500"
-            onMouseEnter={() => {}}
-            onMouseLeave={() => {}}
-        >
-            <h2 className="font-bold text-xl mb-2">{project.name}</h2>
-            <p className="text-gray-700 text-base mb-4">{project.description}</p>
-            <p className="text-gray-600 text-sm">Statut: {project.status}</p>
-            {/* Bouton Découvrir ou toute autre action */}
-        </div>
-    ))}
-</div>
+        {sortedProjects.map((project) => {
+        const roles = mapRolesToMembers(project.members);
 
+        return (
+            <div
+                key={project.id}
+                className="cursor-pointer bg-white rounded-lg shadow p-5 transition duration-300 ease-in-out hover:shadow-lg hover:border-2 hover:border-green-500"
+                onClick={() => handleProjectClick(project.project_slug)}
+            >
+                <div className='flex items-center'>
+                    <span className={`inline-block h-2.5 w-2.5 mr-2 rounded-full ${
+                        project.status === 'in_progress' ? 'bg-orange-500' : project.status === 'not_started' ? 'bg-green-500' : 'bg-gray-500'
+                    }`}></span>
+                    <h2 className="font-bold text-xl">{project.name}</h2>
+                </div>
+                <p className="text-gray-500 text-base mb-2">{formatDate(project.creation_date)}</p>
+                <p className="text-gray-700 text-base mb-4">{project.description}</p>
+                <div>
+                    <h3 className="text-gray-800 font-semibold mb-1">Équipe</h3>
+                    <ul className='font-light text-sm'>
+                        {Object.entries(roles).map(([role, name]) => (
+                            <li key={role}>
+                                • {role}: {name === 'Disponible' ? <span className="text-green-500">{name}</span> : name}
+                            </li>
+                        ))}
+                    </ul>
+
+                </div>
+            </div>
+        );
+    })}
+</div>
             </div>
         </div>
     );

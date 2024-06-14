@@ -29,6 +29,7 @@ class Project(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
+    project_slug = db.Column(db.String(255), unique=True, nullable=False)
     creation_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     status = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=True)
@@ -41,3 +42,13 @@ project_members = db.Table('project_members',
     db.Column('project_id', db.Integer, db.ForeignKey('projects.id'), primary_key=True),  # Conservez project_id comme Integer
     db.Column('user_id', db.String(100), db.ForeignKey('users.id'), primary_key=True)  # Changez user_id en String
 )
+
+class TeamRole(db.Model):
+    __tablename__ = 'team_roles'
+    
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), primary_key=True)
+    user_id = db.Column(db.String(100), db.ForeignKey('users.id'), primary_key=True)
+    role = db.Column(db.String(100), nullable=False)
+
+    project = db.relationship('Project', backref=db.backref('team_roles', lazy=True))
+    user = db.relationship('User', backref=db.backref('team_roles', lazy=True))

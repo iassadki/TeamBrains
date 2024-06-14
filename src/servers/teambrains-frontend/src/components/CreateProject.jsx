@@ -3,10 +3,14 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
 
 const CreateProjectForm = ({ closeModal }) => {
+    const [errorMessage, setErrorMessage] = useState('');
+
     const [project, setProject] = useState({
         name: '',
         status: '',
@@ -29,20 +33,27 @@ const CreateProjectForm = ({ closeModal }) => {
             await axios.post('http://localhost:5001/projects/create_projects', project, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}` // Incluez votre token JWT ici
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
                 }
             });
-            navigate('/projets'); // Redirigez l'utilisateur vers la page des projets après la création
+            navigate('/projets');
         } catch (error) {
+            if (error.response && error.response.data) {
+                toast.error(error.response.data.error || 'Une erreur est survenue lors de la création du projet.');
+            } else {
+                toast.error('Une erreur est survenue lors de la communication avec le serveur.');
+            }
             console.error('Erreur lors de la création du projet:', error);
         }
     };
-
+    
     const handleCancel = () => {
         navigate('/projets');
     };
 
     return (
+        <>
+        <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
         <form onSubmit={handleSubmit} className="w-full p-14">
             <div className="flex flex-col">
                 <h1 className="text-3xl font-semibold">Créer un nouveau projet</h1>
@@ -72,8 +83,8 @@ const CreateProjectForm = ({ closeModal }) => {
                         onChange={handleChange}
                     >
                         <option value="">Sélectionnez l'état du projet</option>
-                        <option value="commencé">Commencé</option>
-                        <option value="en cours">En cours</option>
+                        <option value="not_started">Pas commencé</option>
+                        <option value="in_progress">En cours</option>
                     </select>
                 </div>
                 <div className="w-full md:w-1/3 px-3">
@@ -108,6 +119,7 @@ const CreateProjectForm = ({ closeModal }) => {
                 </button>
             </div>
         </form>
+        </>
     );
 };
 

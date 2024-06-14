@@ -11,6 +11,7 @@ import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Projects from './components/Projects';
 import CreateProject from './components/CreateProject';
+import ProjectDetail from './components/ProjectDetail';
 
 const App = () => {
     return (
@@ -30,6 +31,7 @@ const App = () => {
                             <Route path="/connexion" element={<SignIn />} />
                             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>}/>
                             <Route path="/projets" element={<Projects/>}/>
+                            <Route path="/projets/:slug" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
                             <Route path="/projets/nouveau-projet" element={<PrivateRoute><CreateProject /></PrivateRoute>} />
                         </Routes>
                 </main>

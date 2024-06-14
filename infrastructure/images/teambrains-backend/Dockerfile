@@ -15,6 +15,9 @@ RUN pip install PyJWT
 RUN pip install python-dotenv
 RUN pip install Flask-Bcrypt
 RUN pip install flask-jwt-extended
+RUN pip install python-dateutil
+RUN pip install python-slugify
+
 
 
 COPY /infrastructure/images/teambrains-backend/.env .
