@@ -116,3 +116,12 @@ def get_project(slug):
     }
 
     return jsonify(project_data), 200
+
+
+@projects.route('/delete_project/<int:project_id>', methods=['DELETE'])
+@jwt_required()
+def delete_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    db.session.delete(project)
+    db.session.commit()
+    return jsonify({"message": "Projet supprimé avec succès"}), 200

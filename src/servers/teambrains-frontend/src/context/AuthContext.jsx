@@ -1,33 +1,45 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios'; // Assurez-vous d'avoir axios pour les requêtes HTTP
+import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';  // Correction ici: utiliser jwt_decode correctement
 
 const AuthContext = createContext();
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
+const useAuth = () => {
+    return useContext(AuthContext);
+};
 
-export const AuthProvider = ({ children }) => {
+const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
 
-    // Déclarez fetchUserInfo à un niveau accessible par les fonctions login et useEffect
     const fetchUserInfo = () => {
         const accessToken = localStorage.getItem('accessToken');
         if (accessToken) {
+            try {
+                const decoded = jwtDecode(accessToken);  // Décodage du JWT
+                setCurrentUser({
+                    ...decoded,
+                    accessToken  // Conservez le token dans l'état pour une utilisation future
+                });
+            } catch (error) {
+                console.log("Erreur de décodage du token ou token invalide", error);
+                localStorage.removeItem('accessToken');
+            }
+
+            // Faire l'appel API pour obtenir des données utilisateur détaillées
             axios.get('http://localhost:5001/users/current_user', {
                 headers: {
                     Authorization: `Bearer ${accessToken}`
                 }
             })
             .then(response => {
-                setCurrentUser({
-                    ...response.data,
-                    accessToken
-                });
+                // Mise à jour de l'état avec des données utilisateur détaillées
+                setCurrentUser(current => ({
+                    ...current,
+                    ...response.data  // Fusion des données API avec les données JWT décodées
+                }));
             })
             .catch(error => {
                 console.log("Erreur lors de la récupération de l'utilisateur", error);
-                // Gérez les erreurs, par exemple en effaçant le token invalide
                 localStorage.removeItem('accessToken');
             });
         }
@@ -39,7 +51,6 @@ export const AuthProvider = ({ children }) => {
 
     const login = (accessToken) => {
         localStorage.setItem('accessToken', accessToken);
-        // Appeler fetchUserInfo ici pour mettre à jour l'état après la connexion
         fetchUserInfo();
     };
 
@@ -56,3 +67,5 @@ export const AuthProvider = ({ children }) => {
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+export { useAuth, AuthProvider };

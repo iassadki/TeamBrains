@@ -39,7 +39,7 @@ const NavBar = () => {
     };
 
     return (
-        <nav className="bg-white p-4 fixed w-full z-10 shadow-lg">
+        <nav className="bg-white p-4 fixed w-full z-20 shadow-lg">
             <div className="container mx-auto flex items-center justify-between">
                 <div className="flex items-center">
                     <NavLink to="/">
@@ -62,6 +62,9 @@ const NavBar = () => {
                         {isDropdownOpen && (
                             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg">
                                 <NavLink to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profil</NavLink>
+                                {currentUser.role === "admin" && (
+                                    <NavLink to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin</NavLink>
+                                )}
                                 <button onClick={handleLogout} className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100">Déconnexion</button>
                             </div>
                         )}

@@ -6,10 +6,12 @@ import { SlidersHorizontal } from 'lucide-react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useAuth } from '../context/AuthContext';
 
 
 const Projects = () => {
     
+    const { currentUser, logout } = useAuth();
     const [projects, setProjects] = useState([]);
     const [isExpandedProfile, setIsExpandedProfile] = useState(true);
     const [isExpandedLangage, setIsExpandedLangage] = useState(true);
@@ -166,9 +168,12 @@ const Projects = () => {
                     </div>
                     
                     <div>
+                    {currentUser && currentUser.role === "businessman" && (
+
                     <NavLink to="/projets/nouveau-projet" className="bg-green-500 text-white py-2 px-8 rounded hover:bg-green-600 mt-4 inline-block">
                         Créer un projet
                     </NavLink>
+                )}
                     </div>
                     
                 </div>

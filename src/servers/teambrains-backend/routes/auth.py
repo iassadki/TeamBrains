@@ -38,7 +38,8 @@ def register():
     try:
         db.session.commit()
 
-        access_token = create_access_token(identity=str(new_user.id), expires_delta=datetime.timedelta(minutes=120))
+        additional_claims = {"role": new_user.role}
+        access_token = create_access_token(identity=str(new_user.id), additional_claims=additional_claims, expires_delta=datetime.timedelta(minutes=120))
 
         return jsonify({
             "accessToken": access_token
@@ -61,9 +62,9 @@ def login():
     if not bcrypt.check_password_hash(user.password, data['password']):
         return jsonify({"error": "Unauthorized"}), 401
 
-
+    additional_claims = {"role": user.role}
     # Générer le token avec les claims personnalisés
-    access_token = create_access_token(identity=str(user.id), expires_delta=datetime.timedelta(minutes=120))
+    access_token = create_access_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=datetime.timedelta(minutes=120))
                                        
     return jsonify({
         "accessToken": access_token

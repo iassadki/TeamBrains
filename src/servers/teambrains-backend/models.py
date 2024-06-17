@@ -26,16 +26,16 @@ class User(db.Model):
 
 class Project(db.Model):
     __tablename__ = 'projects'
-
+    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     project_slug = db.Column(db.String(255), unique=True, nullable=False)
     creation_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     status = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    creator_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=False)  # Ajustez ici
-    # Relation pour lier des membres (étudiants ou autres entrepreneurs) au projet
+    creator_id = db.Column(db.String(100), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     members = db.relationship('User', secondary='project_members', backref=db.backref('projects', lazy='dynamic'))
+
 
 # Table associative pour les membres du projet
 project_members = db.Table('project_members',

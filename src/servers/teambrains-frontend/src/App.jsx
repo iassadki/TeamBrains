@@ -12,6 +12,7 @@ import PrivateRoute from './components/PrivateRoute';
 import Projects from './components/Projects';
 import CreateProject from './components/CreateProject';
 import ProjectDetail from './components/ProjectDetail';
+import AdminPanel from './components/Admins/AdminPanel';
 
 const App = () => {
     return (
@@ -33,6 +34,11 @@ const App = () => {
                             <Route path="/projets" element={<Projects/>}/>
                             <Route path="/projets/:slug" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
                             <Route path="/projets/nouveau-projet" element={<PrivateRoute><CreateProject /></PrivateRoute>} />
+                            <Route path="/admin/*" element={
+                                <PrivateRoute roles={['admin']}>
+                                    <AdminPanel />
+                                </PrivateRoute>       
+                                }/>
                         </Routes>
                 </main>
                 <Footer />
