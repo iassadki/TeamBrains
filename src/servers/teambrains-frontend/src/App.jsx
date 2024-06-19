@@ -13,14 +13,15 @@ import Projects from './components/Projects';
 import CreateProject from './components/CreateProject';
 import ProjectDetail from './components/ProjectDetail';
 import AdminPanel from './components/Admins/AdminPanel';
+import AccessDenied from './components/AccessDenied';
 
 const App = () => {
     return (
         <Router>
             <AuthProvider>
-            <div className="flex flex-col min-h-screen">
-                <NavBar />
-                <main className="flex-grow mt-[5rem]" style={{ minHeight: `calc(100vh - 80px)` }}>
+                <div className="flex flex-col min-h-screen">
+                    <NavBar />
+                    <main className="flex-grow mt-[5rem]" style={{ minHeight: `calc(100vh - 80px)` }}>
                         <Routes>
                             <Route path="/" element={
                                 <div>
@@ -30,19 +31,20 @@ const App = () => {
                             } />
                             <Route path="/inscription" element={<SignUp />} />
                             <Route path="/connexion" element={<SignIn />} />
-                            <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>}/>
-                            <Route path="/projets" element={<Projects/>}/>
+                            <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+                            <Route path="/projets" element={<Projects />} />
                             <Route path="/projets/:slug" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
                             <Route path="/projets/nouveau-projet" element={<PrivateRoute><CreateProject /></PrivateRoute>} />
                             <Route path="/admin/*" element={
                                 <PrivateRoute roles={['admin']}>
                                     <AdminPanel />
-                                </PrivateRoute>       
-                                }/>
+                                </PrivateRoute>
+                            } />
+                            <Route path="/access-denied" element={<AccessDenied />} />
                         </Routes>
-                </main>
-                <Footer />
-            </div>
+                    </main>
+                    <Footer />
+                </div>
             </AuthProvider>
         </Router>
     );

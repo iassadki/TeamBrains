@@ -3,43 +3,82 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useAuth } from '../context/AuthContext';
 
 const ProjectDetail = () => {
     const { slug } = useParams();
     const [project, setProject] = useState(null);
+    const { currentUser } = useAuth();
 
     const mapRolesToMembers = (members) => {
         const roles = {
             'FullStack': 'Disponible',
-            'Backend': 'Disponible',
-            'Frontend': 'Disponible',
+            'BackEnd': 'Disponible',
+            'FrontEnd': 'Disponible',
             'Designer': 'Disponible'
         };
-    
+
         members.forEach(member => {
             const cleanedRole = member.role.replace(/['"\\]+/g, ''); // Supprime les guillemets et les caractères d'échappement
             if (roles.hasOwnProperty(cleanedRole)) {
                 roles[cleanedRole] = member.name;
             }
         });
-        
+
         return roles;
     };
 
-    useEffect(() => {
-        const fetchProject = async () => {
-            try {
-                const response = await axios.get(`http://localhost:5001/projects/get_project/${slug}`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                    }
-                });
-                setProject(response.data);
-            } catch (error) {
-                console.error('Erreur lors de la récupération du projet:', error);
-            }
-        };
+    const joinProject = async () => {
+        try {
+            const response = await axios.post(`http://localhost:5001/projects/join_project/${project.id}`, {}, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            alert(response.data.message);  // Afficher une alerte avec le message de réussite
+            fetchProject();  // Rafraîchir les détails du projet
+        } catch (error) {
+            console.error('Erreur lors de la tentative de rejoindre le projet:', error.response.data.error);
+            alert(error.response.data.error);  // Afficher une alerte avec le message d'erreur
+        }
+    };
 
+    const leaveProject = async () => {
+        try {
+            const response = await axios.post(`http://localhost:5001/projects/leave_project/${project.id}`, {}, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            alert(response.data.message);  // Afficher une alerte avec le message de réussite
+            fetchProject();  // Rafraîchir les détails du projet
+        } catch (error) {
+            console.error('Erreur lors de la tentative de quitter le projet:', error.response.data.error);
+            alert(error.response.data.error);  // Afficher une alerte avec le message d'erreur
+        }
+    };
+
+    const fetchProject = async () => {
+        try {
+            const response = await axios.get(`http://localhost:5001/projects/get_project/${slug}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            setProject(response.data);
+        } catch (error) {
+            console.error('Erreur lors de la récupération du projet:', error);
+        }
+    };
+
+    const checkMembership = () => {
+        if (!project || !currentUser) {
+            return false;
+        }
+        return project.members.some(member => member.user_id === currentUser.id);
+    };
+
+    useEffect(() => {
         fetchProject();
     }, [slug]);
 
@@ -66,9 +105,15 @@ const ProjectDetail = () => {
                             ))}
                         </ul>
                     </div>
-                    <button className='mt-4 bg-green-tb text-white py-2 px-4 rounded-md'>
-                        Rejoindre l'équipe
-                    </button>
+                    {checkMembership() ? (
+                        <button className='mt-4 bg-red-600 text-white py-2 px-4 rounded-md' onClick={leaveProject}>
+                            Quitter l'équipe
+                        </button>
+                    ) : (
+                        <button className='mt-4 bg-green-600 text-white py-2 px-4 rounded-md' onClick={joinProject}>
+                            Rejoindre l'équipe
+                        </button>
+                    )}
                 </div>
             ) : (
                 <p>Chargement des détails du projet...</p>

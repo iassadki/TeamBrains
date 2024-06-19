@@ -40,15 +40,6 @@ class Project(db.Model):
 # Table associative pour les membres du projet
 project_members = db.Table('project_members',
     db.Column('project_id', db.Integer, db.ForeignKey('projects.id'), primary_key=True),  # Conservez project_id comme Integer
-    db.Column('user_id', db.String(100), db.ForeignKey('users.id'), primary_key=True)  # Changez user_id en String
+    db.Column('user_id', db.String(100), db.ForeignKey('users.id'), primary_key=True),  # Changez user_id en String
+    db.Column('role', db.String(100), nullable=False) 
 )
-
-class TeamRole(db.Model):
-    __tablename__ = 'team_roles'
-    
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), primary_key=True)
-    user_id = db.Column(db.String(100), db.ForeignKey('users.id'), primary_key=True)
-    role = db.Column(db.String(100), nullable=False)
-
-    project = db.relationship('Project', backref=db.backref('team_roles', lazy=True))
-    user = db.relationship('User', backref=db.backref('team_roles', lazy=True))

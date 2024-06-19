@@ -29,7 +29,7 @@ def register():
         prenom=user_data['prenom'],
         email=user_data['email'],
         password=hashed_password,
-        typeDeveloppeur=user_data.get('typeDeveloppeur', None),
+        typeDeveloppeur=user_data.get('typeDeveloppeur'),
         technologies=technologies_str
     )
     

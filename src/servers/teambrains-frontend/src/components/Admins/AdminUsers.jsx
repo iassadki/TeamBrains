@@ -57,7 +57,7 @@ const AdminUsers = () => {
                                 <td className="p-3">{user.prenom}</td>
                                 <td className="p-3">{user.role}</td>
                                 <td className="p-3">{user.email}</td>
-                                <td className="p-3 text-center">
+                                <td className="p-3 align-center">
                                     <button
                                         onClick={() => deleteUser(user.id)}
                                         className="bg-red-400 rounded p-1 px-4 text-white hover:text-white hover:bg-red-500"

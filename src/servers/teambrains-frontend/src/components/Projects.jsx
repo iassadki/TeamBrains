@@ -41,8 +41,8 @@ const Projects = () => {
     const mapRolesToMembers = (members) => {
         const roles = {
             'FullStack': 'Disponible',
-            'Backend': 'Disponible',
-            'Frontend': 'Disponible',
+            'BackEnd': 'Disponible',
+            'FrontEnd': 'Disponible',
             'Designer': 'Disponible'
         };
     
@@ -109,15 +109,15 @@ const Projects = () => {
                             {/* Liste des cases à cocher ici */}
                             <label className="block mb-2">
                                 <input type="checkbox" className="mr-2" />
-                                Full-stack
+                                FullStack
                             </label>
                             <label className="block mb-2">
                                 <input type="checkbox" className="mr-2" />
-                                Backend
+                                BackEnd
                             </label>
                             <label className="block mb-2">
                                 <input type="checkbox" className="mr-2" />
-                                Frontend
+                                FrontEnd
                             </label>
                             <label className="block">
                                 <input type="checkbox" className="mr-2" />
@@ -166,15 +166,14 @@ const Projects = () => {
                         <h1 className="text-3xl font-semibold">Rejoindre un projet</h1>
                         <p className="text-sm text-gray-500 font-light mt-1 w-4/5">Explorez les projets actuels à la recherche de talents. Faites votre choix et contribuez à des initiatives innovantes.</p>
                     </div>
-                    
-                    <div>
-                    {currentUser && currentUser.role === "businessman" && (
 
-                    <NavLink to="/projets/nouveau-projet" className="bg-green-500 text-white py-2 px-8 rounded hover:bg-green-600 mt-4 inline-block">
-                        Créer un projet
-                    </NavLink>
-                )}
+                    {currentUser && currentUser.role === "businessman" && (
+                    <div>
+                        <NavLink to="/projets/nouveau-projet" className="bg-green-500 text-white py-2 px-6 rounded hover:bg-green-600 mt-4 inline-block text-sm">
+                            Créer un projet
+                        </NavLink>
                     </div>
+                    )}
                     
                 </div>
                 

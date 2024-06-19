@@ -37,6 +37,8 @@ const SignUp = () => {
                 email: formData.email,
                 password: formData.password,
                 role: formData.role,
+                typeDeveloppeur: formData.typeDeveloppeur,
+                technologies: formData.technologies
                 // Ajoutez d'autres champs si nécessaire, comme `typeDeveloppeur` et `technologies`
             }
         })

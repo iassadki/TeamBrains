@@ -76,7 +76,7 @@ const AdminProjects = () => {
                                         </div>
                                     ))}
                                 </td>
-                                <td className="p-3 text-center">
+                                <td className="p-3 align-center">
                                     <button 
                                         onClick={() => deleteProject(project.id)}
                                         className="bg-red-400 rounded p-1 px-4 text-white hover:text-white hover:bg-red-500"

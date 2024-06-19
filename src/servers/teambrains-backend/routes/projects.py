@@ -1,15 +1,13 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, Project 
+from models import db, User, Project, project_members
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from dateutil import parser
 from dateutil.tz import UTC
 from slugify import slugify
-
-
+from sqlalchemy.orm import joinedload
 
 projects = Blueprint('projects', __name__)
-
 
 @projects.route('/create_projects', methods=['POST'])
 @jwt_required()
@@ -28,7 +26,6 @@ def create_project():
     if end_date:
         try:
             end_date = parser.isoparse(end_date)
-            # Assurez-vous que l'objet datetime est naïf en utilisant la fonction replace pour supprimer les informations de fuseau horaire
             if end_date.tzinfo is not None:
                 end_date = end_date.astimezone(UTC).replace(tzinfo=None)
 
@@ -42,50 +39,43 @@ def create_project():
         status=data['status'],
         description=data['description'],
         creator_id=user_id,
-        # end_date=end_date,
         project_slug=project_slug
     )
     db.session.add(new_project)
     db.session.commit()
     return jsonify({"message": "Projet créé avec succès", "project_id": new_project.id}), 201
 
-
-
-
-
 @projects.route('/list_projects', methods=['GET'])
 def list_projects():
-    # Récupérez tous les projets de la base de données
-    all_projects = Project.query.all()
-    
-    # Convertissez chaque projet en dictionnaire pour faciliter la sérialisation en JSON
+    all_projects = Project.query.options(joinedload(Project.members)).all()
     projects_list = []
+
     for project in all_projects:
-        # Liste des membres et leurs rôles dans le projet
-        members = []
-        for team_role in project.team_roles:
-            member_info = {
-                'user_id': team_role.user_id,
-                'name': f"{team_role.user.prenom} {team_role.user.nom}",
-                'role': team_role.role
-            }
-            members.append(member_info)
-        
-        # Créez le dictionnaire de projet avec les membres inclus
+        members = db.session.query(User, project_members.c.role).join(
+            project_members, (User.id == project_members.c.user_id)
+        ).filter(project_members.c.project_id == project.id).all()
+
+        members_list = [
+            {
+                'user_id': member.User.id,
+                'name': f"{member.User.prenom} {member.User.nom}",
+                'role': member.role
+            } for member in members
+        ]
+
         project_dict = {
             'id': project.id,
             'name': project.name,
             'project_slug': project.project_slug,
             'status': project.status,
             'description': project.description,
-            'creation_date': project.creation_date.isoformat(),  # Convertit datetime en string
+            'creation_date': project.creation_date.isoformat(),
             'creator_id': project.creator_id,
-            'members': members  # Ajoutez les membres ici
+            'members': members_list
         }
         projects_list.append(project_dict)
-    
-    return jsonify(projects_list), 200
 
+    return jsonify(projects_list), 200
 
 @projects.route('/get_project/<slug>', methods=['GET'])
 def get_project(slug):
@@ -93,16 +83,17 @@ def get_project(slug):
     if not project:
         return jsonify({"error": "Projet non trouvé"}), 404
 
-    # Récupérer les membres et leurs rôles associés à ce projet
-    members = []
-    for team_role in project.team_roles:
-        user = User.query.get(team_role.user_id)
-        if user:
-            members.append({
-                "user_id": user.id,
-                "name": f"{user.prenom} {user.nom}",
-                "role": team_role.role
-            })
+    members = db.session.query(User, project_members.c.role).join(
+        project_members, (User.id == project_members.c.user_id)
+    ).filter(project_members.c.project_id == project.id).all()
+
+    members_list = [
+        {
+            'user_id': member.User.id,
+            'name': f"{member.User.prenom} {member.User.nom}",
+            'role': member.role
+        } for member in members
+    ]
 
     project_data = {
         'id': project.id,
@@ -112,11 +103,62 @@ def get_project(slug):
         'description': project.description,
         'creation_date': project.creation_date.isoformat(),
         'creator_id': project.creator_id,
-        'members': members  # Ajout des membres du projet
+        'members': members_list
     }
 
     return jsonify(project_data), 200
 
+@projects.route('/join_project/<int:project_id>', methods=['POST'])
+@jwt_required()
+def join_project(project_id):
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "Utilisateur non trouvé"}), 404
+
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({"error": "Projet non trouvé"}), 404
+
+    # Vérifiez si l'utilisateur est déjà membre du projet
+    if db.session.query(project_members).filter_by(project_id=project_id, user_id=user_id).first():
+        return jsonify({"error": "Utilisateur déjà membre du projet"}), 400
+
+    # Vérifiez si le rôle correspondant au type de développeur de l'utilisateur est disponible
+    role = user.typeDeveloppeur
+    existing_member = db.session.query(project_members).filter_by(project_id=project_id, role=role).first()
+    if existing_member:
+        return jsonify({"error": f"Le rôle {role} est déjà pris dans ce projet"}), 400
+
+    # Ajoutez l'utilisateur au projet avec le rôle correspondant
+    stmt = project_members.insert().values(project_id=project_id, user_id=user_id, role=role)
+    db.session.execute(stmt)
+    db.session.commit()
+
+    return jsonify({"message": "Utilisateur ajouté au projet avec succès"}), 200
+
+@projects.route('/leave_project/<int:project_id>', methods=['POST'])
+@jwt_required()
+def leave_project(project_id):
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "Utilisateur non trouvé"}), 404
+
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({"error": "Projet non trouvé"}), 404
+
+    # Vérifiez si l'utilisateur est membre du projet
+    if not db.session.query(project_members).filter_by(project_id=project_id, user_id=user_id).first():
+        return jsonify({"error": "Utilisateur n'est pas membre du projet"}), 400
+
+    # Retirez l'utilisateur du projet
+    stmt = project_members.delete().where(project_members.c.project_id == project_id, project_members.c.user_id == user_id)
+    db.session.execute(stmt)
+    db.session.commit()
+
+    return jsonify({"message": "Utilisateur retiré du projet avec succès"}), 200
 
 @projects.route('/delete_project/<int:project_id>', methods=['DELETE'])
 @jwt_required()
