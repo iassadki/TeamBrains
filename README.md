@@ -31,3 +31,38 @@ La plateforme est dédiée exclusivement aux projets informatiques et digitaux, 
 
 ## Note
 TeamBrains vise à créer un écosystème où la passion pour l'informatique et l'ambition entrepreneuriale se rencontrent pour transformer les idées en réalités tangibles, en favorisant une expérience enrichissante pour tous les participants. Rejoignez-nous pour bâtir l'avenir !
+
+# Déploiement du projet
+Cette partie a pour but de guider étape par étape l’utilisateur sur le processus de build et déploiement du projet TeamBrains.
+
+Avant de commencer l'installation de notre plateforme, assurez-vous que disposez de Docker Desktop installé sur votre machine.
+
+Voici les étapes à suivre pour déployer notre plateforme sur votre système :
+
+## Étape 1 : Ouvrir le terminal
+Ouvrez votre terminal. Sur Windows, vous pouvez utiliser PowerShell ou l'invite de commandes. Sur MacOS et Linux, vous pouvez utiliser le terminal intégré.
+
+## Étape 2 : Se placer dans le répertoire cible
+Naviguez jusqu'au répertoire dans lequel vous souhaitez cloner le projet. Utilisez la commande cd (change directory) pour cela. Par exemple, si vous souhaitez placer le projet dans un répertoire nommé "MonProjet" sur le bureau, vous écririez :
+```cd ~/Desktop/MonProjet```
+
+## Étape 3: Cloner le projet
+Vous pouvez maintenant cloner le projet à partir du dépôt GitHub. Utilisez la commande git clone pour cela :
+```git clone https://github.com/benribou/TeamBrains.git```
+
+Ceci clonera le projet dans le répertoire "MonProjet".
+
+## Étape 4: Lancer l'application avec Docker
+
+Naviguez jusqu'au répertoire **"/infrastructure"**. Maintenant, vous pouvez lancer la plateforme avec Docker. Utilisez la commande docker pour construire et démarrer les services de votre application : ```docker-compose up --build```
+
+Le build peut durer quelques minutes en fonction de votre connexion internet.
+
+Veuillez noter que chaque étape suppose que vous êtes dans le répertoire du projet après avoir cloné le dépôt. Si vous rencontrez des erreurs, assurez-vous que vous êtes dans le bon répertoire avant d'exécuter chaque commande.
+
+Une fois le build terminé, vous devriez voir vos 3 conteneurs tourner sur Docker Dekstop.
+Si c’est le cas, félicitation le projet doit maintenant être en cours d'exécution sur votre système et vous devriez pouvoir y accéder via l’url suivante sur le navigateur de votre ordinateur : 
+
+```localhost```
+
+Et le projet est lancé !
