@@ -1,4 +1,22 @@
+import React, { useState, useEffect } from 'react';
+
 const StepTwo = ({ nextStep, prevStep, handleChange, values, submitForm }) => {
+
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleSubmit = () => {
+    if (!values.nom || !values.prenom || !values.email || !values.password) {
+      setErrorMessage('Tous les champs doivent être remplis.');
+    } else {
+      setErrorMessage('');
+      if (values.role === 'student') {
+        nextStep();
+      } else {
+        submitForm();
+      }
+    }
+  };
+
     return (
         <div className="flex flex-col items-center justify-center py-28">
         <div className="w-full max-w-xl">
@@ -37,7 +55,7 @@ const StepTwo = ({ nextStep, prevStep, handleChange, values, submitForm }) => {
             <button className="mt-4 bg-gray-200 text-gray-700 py-2 px-4 rounded hover:bg-gray-300" type="button" onClick={prevStep}>
                 Retour
             </button>
-            {values.userType === 'étudiant' ? (
+            {values.role === 'student' ? (
                 <button className="mt-4 bg-green-tb text-white py-2 px-4 rounded hover:bg-green-600" type="button" onClick={nextStep}>
                 Suivant
                 </button>

@@ -5,7 +5,7 @@ const StepThree = ({ nextStep, prevStep, handleChange, values }) => {
     const typesDeDeveloppeur = ["FrontEnd", "BackEnd", "FullStack", "Designer"];
 
     const handleNextStep = () => {
-        if (!values.typeDeDeveloppeur) {
+        if (!values.typeDeveloppeur) {
             setError('Veuillez sélectionner un profil pour continuer.');
         } else {
             setError('');
@@ -25,10 +25,10 @@ const StepThree = ({ nextStep, prevStep, handleChange, values }) => {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        handleChange('typeDeDeveloppeur')({ target: { value: type } });
+                                        handleChange('typeDeveloppeur')({ target: { value: type } });
                                         setError(''); // Efface l'erreur lorsqu'une sélection est faite
                                     }}
-                                    className={`w-full text-left px-4 py-2 border rounded ${values.typeDeDeveloppeur === type ? 'bg-green-500 text-white' : 'bg-white'}`}
+                                    className={`w-full text-left px-4 py-2 border rounded ${values.typeDeveloppeur === type ? 'bg-green-500 text-white' : 'bg-white'}`}
                                 >
                                     {type}
                                 </button>

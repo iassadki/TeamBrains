@@ -17,6 +17,19 @@ export default {
     }
     },
   },
-  plugins: [],
+  plugins: [require("rippleui")],
+  rippleui: {
+    defaultStyle: false,
+    removeThemes: ["dark"],
+    themes: [
+      {
+        themeName: "light",
+        colorScheme: "light",
+        colors: {
+          primary: "#00C673",
+          backgroundPrimary: "#964643",
+        },
+      }
+    ],
+  },
 }
-

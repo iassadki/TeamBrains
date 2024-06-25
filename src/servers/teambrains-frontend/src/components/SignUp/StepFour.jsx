@@ -19,7 +19,7 @@ const StepFour = ({ prevStep, handleChange, values, submitForm }) => {
       };
       
     
-    const techsToDisplay = technologies[values.typeDeDeveloppeur] || [];
+    const techsToDisplay = technologies[values.typeDeveloppeur] || [];
   
     return (
       <div className="flex flex-col items-center py-40">
