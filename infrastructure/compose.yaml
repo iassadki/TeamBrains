@@ -1,12 +1,12 @@
 version: '3.8'
 services:
-  # frontend:
-  #   build: 
-  #     context: ..
-  #     dockerfile: infrastructure/images/teambrains-frontend/Dockerfile
-  #   container_name: teambrains-frontend
-  #   ports:
-  #     - "5173:5173"
+  frontend:
+    build: 
+      context: ..
+      dockerfile: infrastructure/images/teambrains-frontend/Dockerfile
+    container_name: teambrains-frontend
+    ports:
+      - "5173:5173"
 
   backend:
       build:

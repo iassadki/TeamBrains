@@ -1,6 +1,6 @@
 FROM node:17-alpine
 WORKDIR /app
-COPY src/servers/teambrains-frontend/package.json .
+COPY src/servers/teambrains-frontend/package*.json ./
 RUN npm i
 RUN npm install rippleui
 RUN npm install axios

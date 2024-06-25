@@ -5,7 +5,7 @@ import { CircleUserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
 import SignIn from './SignIn';
-import SignUp from './Signup/Signup';
+import SignUp from './SignUp/Signup';
 import { useNavigate } from 'react-router-dom';
 
 const NavBar = () => {
