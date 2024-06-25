@@ -1,7 +1,7 @@
 FROM python:3.9-alpine
 
 # Installez les dépendances nécessaires, y compris postgresql-client
-RUN apk update && apk add --no-cache postgresql-client
+RUN apk update && apk add --no-cache postgresql-client dos2unix
 
 WORKDIR /app
 
@@ -23,6 +23,9 @@ RUN pip install python-slugify
 COPY /infrastructure/images/teambrains-backend/.env .
 COPY src/servers/teambrains-backend/ .
 
+RUN ls -l /app
+
+RUN dos2unix /app/postgres.sh
 RUN chmod +x /app/postgres.sh
 
 
