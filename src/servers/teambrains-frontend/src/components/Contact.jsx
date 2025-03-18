@@ -48,6 +48,10 @@ const Contact = () => {
                             <input placeholder="nom@email.com" type="email" className="input max-w-full" value={email} onChange={(e) => setEmail(e.target.value)} />
                         </div>
                         <div className="form-field">
+                            <label className="form-label">Sujet</label>
+                            <input placeholder="Sujet" type="subject" className="input max-w-full" value={subject} onChange={(e) => setEmail(e.target.value)} />
+                        </div>
+                        <div className="form-field">
                             <label className="form-label">Message</label>
                             <textarea placeholder="Votre message" className="input max-w-full" value={message} onChange={(e) => setMessage(e.target.value)} />
                             {/* <input placeholder="Votre message" type="text" className="input max-w-full" value={message} onChange={(e) => setMessage(e.target.value)} /> */}
