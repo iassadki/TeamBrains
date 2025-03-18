@@ -1,7 +1,7 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import logo from "../assets/logo_teambrains.svg";
-import { CircleUserRound } from 'lucide-react';
+import { CircleUserRound, Menu, X, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
 import SignIn from './SignIn';
@@ -9,89 +9,270 @@ import SignUp from './SignUp/Signup';
 import { useNavigate } from 'react-router-dom';
 
 const NavBar = () => {
-
+    // États pour gérer les différents éléments interactifs
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
     const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     const { currentUser, logout } = useAuth();
     const dropdownRef = useRef(null);
+    const mobileMenuRef = useRef(null);
     const navigate = useNavigate();
 
     useEffect(() => {
         console.log(currentUser)
+        // Fonction pour fermer les menus lors d'un clic à l'extérieur
         const handleClickOutside = (event) => {
-          if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-            setIsDropdownOpen(false);
-          }
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsDropdownOpen(false);
+            }
+            if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target) &&
+                !event.target.classList.contains('mobile-menu-button')) {
+                setIsMobileMenuOpen(false);
+            }
         };
-      
+
         document.addEventListener("mousedown", handleClickOutside);
         return () => {
-          document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("mousedown", handleClickOutside);
         };
-      }, [dropdownRef]);
+    }, [dropdownRef, mobileMenuRef]);
 
-      const handleLogout = () => {
+    // Gérer la déconnexion de l'utilisateur
+    const handleLogout = () => {
         logout();
         setIsDropdownOpen(false);
+        setIsMobileMenuOpen(false);
         navigate('/');
+    };
+
+    // Basculer l'état du menu mobile
+    const toggleMobileMenu = () => {
+        setIsMobileMenuOpen(!isMobileMenuOpen);
+    };
+
+    // Basculer l'état de la barre de recherche mobile
+    const toggleSearch = () => {
+        setIsSearchOpen(!isSearchOpen);
     };
 
     return (
         <nav className="bg-white p-4 fixed w-full z-20 shadow-lg">
             <div className="container mx-auto flex items-center justify-between">
+                {/* Logo - visible sur toutes les tailles d'écran */}
                 <div className="flex items-center">
                     <NavLink to="/">
-                        <img src={logo} alt="Logo" className="h-12 w-32 mr-2"/>
+                        <img src={logo} alt="Logo" className="h-10 w-28 sm:h-12 sm:w-32 mr-2" />
                     </NavLink>
                 </div>
-                <div className="flex-1 mx-4">
-                    <input type="text" placeholder="Rechercher..." className="text-xs w-full p-2 rounded bg-gray-100"/>
-                </div>
-                <div className="flex items-center">
-                    <NavLink to="/" className={({ isActive }) => isActive ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium" : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"}>Accueil</NavLink>
-                    <NavLink to="/projets" className={({ isActive }) => isActive ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium" : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"}>Projets</NavLink>
-                    <NavLink to="/contact" className={({ isActive }) => isActive ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium" : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"}>Contact</NavLink>
-                    {currentUser ? (
-                    <div ref={dropdownRef} className="relative">
-                        <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium">
-                            <CircleUserRound />
-                            <span className="ml-2">{`${currentUser.prenom} ${currentUser.nom}`}</span>
-                        </button>
-                        {isDropdownOpen && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg">
-                                <NavLink to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profil</NavLink>
-                                {currentUser.role === "admin" && (
-                                    <NavLink to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin</NavLink>
-                                )}
-                                <button onClick={handleLogout} className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100">Déconnexion</button>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <>
-                        <button onClick={() => setIsSignInModalOpen(true)} className="text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium">
-                            Se connecter
-                        </button>
-                        <button onClick={() => setIsSignUpModalOpen(true)} className="bg-gray-800 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-600">
-                            S'inscrire
-                        </button>
 
-                    </>
-                )}
+                {/* Barre de recherche - visible uniquement sur les écrans moyens et grands */}
+                <div className="hidden md:flex flex-1 mx-4">
+                    <input
+                        type="text"
+                        placeholder="Rechercher..."
+                        className="text-xs w-3/4 p-2 rounded bg-gray-100"
+                    />
+                </div>
+
+                {/* Liens de navigation - visibles sur les écrans moyens et grands */}
+                <div className="hidden md:flex items-center">
+                    <NavLink to="/" className={({ isActive }) =>
+                        isActive
+                            ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                            : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                    }>
+                        Accueil
+                    </NavLink>
+                    <NavLink to="/projets" className={({ isActive }) =>
+                        isActive
+                            ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                            : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                    }>
+                        Projets
+                    </NavLink>
+                    <NavLink to="/contact" className={({ isActive }) =>
+                        isActive
+                            ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                            : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                    }>
+                        Contact
+                    </NavLink>
+                    {currentUser ? (
+                        <div ref={dropdownRef} className="relative">
+                            <button
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                className="flex items-center text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                            >
+                                <CircleUserRound />
+                                <span className="ml-2">{`${currentUser.prenom} ${currentUser.nom}`}</span>
+                            </button>
+                            {isDropdownOpen && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg">
+                                    <NavLink to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        Profil
+                                    </NavLink>
+                                    {currentUser.role === "admin" && (
+                                        <NavLink to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                            Admin
+                                        </NavLink>
+                                    )}
+                                    <button
+                                        onClick={handleLogout}
+                                        className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100"
+                                    >
+                                        Déconnexion
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                onClick={() => setIsSignInModalOpen(true)}
+                                className="text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                            >
+                                Se connecter
+                            </button>
+                            <button
+                                onClick={() => setIsSignUpModalOpen(true)}
+                                className="bg-gray-800 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-600"
+                            >
+                                S'inscrire
+                            </button>
+                        </>
+                    )}
+                </div>
+
+                {/* Boutons mobiles (recherche et menu) */}
+                <div className="md:hidden flex items-center space-x-1">
+                    <button
+                        onClick={toggleSearch}
+                        className="p-2 text-gray-700 hover:text-green-tb"
+                    >
+                        <Search size={20} />
+                    </button>
+                    <button
+                        onClick={toggleMobileMenu}
+                        className="mobile-menu-button p-2 text-gray-700 hover:text-green-tb"
+                    >
+                        {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
                 </div>
             </div>
+
+            {/* Barre de recherche mobile - affichée conditionnellement */}
+            {isSearchOpen && (
+                <div className="md:hidden pt-2 pb-2 px-4">
+                    <input
+                        type="text"
+                        placeholder="Rechercher..."
+                        className="text-xs w-full p-2 rounded bg-gray-100"
+                    />
+                </div>
+            )}
+
+            {/* Menu mobile - affiché conditionnellement */}
+            {isMobileMenuOpen && (
+                <div
+                    ref={mobileMenuRef}
+                    className="md:hidden bg-white pt-2 pb-4 px-4 shadow-inner"
+                >
+                    <div className="flex flex-col space-y-2">
+                        <NavLink
+                            to="/"
+                            className={({ isActive }) =>
+                                isActive
+                                    ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                                    : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                            }
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            Accueil
+                        </NavLink>
+                        <NavLink
+                            to="/projets"
+                            className={({ isActive }) =>
+                                isActive
+                                    ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                                    : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                            }
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            Projets
+                        </NavLink>
+                        <NavLink
+                            to="/contact"
+                            className={({ isActive }) =>
+                                isActive
+                                    ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                                    : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                            }
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            Contact
+                        </NavLink>
+                        {currentUser ? (
+                            <>
+                                <NavLink
+                                    to="/profile"
+                                    className="text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Profil
+                                </NavLink>
+                                {currentUser.role === "admin" && (
+                                    <NavLink
+                                        to="/admin"
+                                        className="text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
+                                        Admin
+                                    </NavLink>
+                                )}
+                                <button
+                                    onClick={handleLogout}
+                                    className="text-left text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                                >
+                                    Déconnexion
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        setIsSignInModalOpen(true);
+                                        setIsMobileMenuOpen(false);
+                                    }}
+                                    className="text-left text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
+                                >
+                                    Se connecter
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsSignUpModalOpen(true);
+                                        setIsMobileMenuOpen(false);
+                                    }}
+                                    className="text-left bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-600"
+                                >
+                                    S'inscrire
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Modaux pour la connexion et l'inscription */}
             <Modal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} width="max-w-xl">
                 <SignIn onSuccessfulLogin={() => setIsSignInModalOpen(false)} />
             </Modal>
 
-
             <Modal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} width="max-w-4xl">
                 <SignUp />
             </Modal>
-
-
         </nav>
     );
 };
