@@ -71,11 +71,33 @@ const ProjectDetail = () => {
         }
     };
 
+    const startProject = async () => {
+        try {
+            const response = await axios.post(`http://localhost:5001/projects/start_project/${project.id}`, {}, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            alert(response.data.message);  // Afficher une alerte avec le message de réussite
+            fetchProject();  // Rafraîchir les détails du projet
+        } catch (error) {
+            console.error('Erreur lors de la tentative de démarrer le projet:', error.response.data.error);
+            alert(error.response.data.error);  // Afficher une alerte avec le message d'erreur
+        }
+    };
+
     const checkMembership = () => {
         if (!project || !currentUser) {
             return false;
         }
         return project.members.some(member => member.user_id === currentUser.id);
+    };
+
+    const checkCreator = () => {
+        if (!project || !currentUser) {
+            return false;
+        }
+        return project.creator_id === currentUser.id;
     };
 
     useEffect(() => {
@@ -90,7 +112,7 @@ const ProjectDetail = () => {
 
     return (
         <div className="mx-12 my-12 p-12 bg-white shadow-lg rounded">
-            {project ? (
+            {project ? (                
                 <div>
                     <h1 className="text-3xl font-bold">{project.name}</h1>
                     <p className="text-sm text-gray-500 mb-4">{formatDate(project.creation_date)}</p>
@@ -105,10 +127,19 @@ const ProjectDetail = () => {
                             ))}
                         </ul>
                     </div>
-                    {checkMembership() ? (
-                        <button className='mt-4 bg-red-600 text-white py-2 px-4 rounded-md' onClick={leaveProject}>
-                            Quitter l'équipe
-                        </button>
+                    {checkMembership() || checkCreator() ? (
+                        <>
+                            {checkMembership() && project.status === "not_started" && (
+                                <button className='mt-4 bg-red-600 text-white py-2 px-4 rounded-md' onClick={leaveProject}>
+                                    Quitter l'équipe
+                                </button>
+                            )}
+                            {checkCreator() && project.status === "not_started" && (
+                                <button className='mt-4 bg-green-600 text-white py-2 px-4 rounded-md' onClick={startProject}>
+                                    Lancer le projet
+                                </button>
+                            )}
+                        </>
                     ) : (
                         <button className='mt-4 bg-green-600 text-white py-2 px-4 rounded-md' onClick={joinProject}>
                             Rejoindre l'équipe

@@ -163,6 +163,7 @@ const Profile = () => {
                         )}
                     </div>
                 )}
+                {userInfo.role !== 'businessman' && (
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Technologies</label>
                     <div className="grid grid-cols-3 gap-4 mb-4 mt-2">
@@ -178,6 +179,7 @@ const Profile = () => {
                     </div>
                     {isEditable && <p className="text-sm text-gray-500">Cliquez sur les technologies pour les ajouter ou les supprimer.</p>}
                 </div>
+                )}
                 {isEditable && (
                     <div className="flex justify-between mt-6">
                         <button
