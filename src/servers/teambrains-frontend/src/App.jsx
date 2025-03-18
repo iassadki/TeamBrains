@@ -14,6 +14,7 @@ import CreateProject from './components/CreateProject';
 import ProjectDetail from './components/ProjectDetail';
 import AdminPanel from './components/Admins/AdminPanel';
 import AccessDenied from './components/AccessDenied';
+import Contact from './components/Contact';
 
 const App = () => {
     return (
@@ -33,6 +34,7 @@ const App = () => {
                             <Route path="/connexion" element={<SignIn />} />
                             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                             <Route path="/projets" element={<Projects />} />
+                            <Route path="/contact" element={<Contact />} />
                             <Route path="/projets/:slug" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
                             <Route path="/projets/nouveau-projet" element={<PrivateRoute><CreateProject /></PrivateRoute>} />
                             <Route path="/admin/*" element={
