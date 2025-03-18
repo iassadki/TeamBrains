@@ -43,7 +43,7 @@ const Contact = () => {
                         </div>
                         <div className="form-field">
                             <label className="form-label">Message</label>
-                            <textarea id='message' placeholder="Votre message" className="input max-w-full" value={message} onChange={(e) => setMessage(e.target.value)} />
+                            <textarea onResize={none} id='message' placeholder="Votre message" className="input max-w-full" value={message} onChange={(e) => setMessage(e.target.value)} />
                             {/* <input placeholder="Votre message" type="text" className="input max-w-full" value={message} onChange={(e) => setMessage(e.target.value)} /> */}
                         </div>
                         <div className="form-field pt-5">
