@@ -9,6 +9,7 @@ const Contact = () => {
 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
+    const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     // const [errorMessage, setErrorMessage] = useState('');  
 
@@ -49,7 +50,7 @@ const Contact = () => {
                         </div>
                         <div className="form-field">
                             <label className="form-label">Sujet</label>
-                            <input placeholder="Sujet" type="subject" className="input max-w-full" value={subject} onChange={(e) => setEmail(e.target.value)} />
+                            <input placeholder="Sujet" type="subject" className="input max-w-full" value={subject} onChange={(e) => setSubject(e.target.value)} />
                         </div>
                         <div className="form-field">
                             <label className="form-label">Message</label>
