@@ -198,12 +198,10 @@ def start_project(project_id):
         return jsonify({"message": "Projet démarré avec succès"}), 200
     else:
         missing_roles = []
-        if 'FullStack' not in roles:
-            missing_roles.append("un FullStack")
+        if 'BackEnd' in roles or 'FrontEnd' in roles:
             if 'BackEnd' not in roles:
                 missing_roles.append("un BackEnd")
             if 'FrontEnd' not in roles:
-                missing_roles.append("un FrontEnd")
-            
-            error_message = "Le projet ne peut être démarré car il manque les rôles nécessaires : " + ", ".join(missing_roles) + "."
+                missing_roles.append("un FrontEnd")            
+            error_message = "Le projet ne peut être démarré car il manque les rôles nécessaires : " + ", ".join(missing_roles) + " ou un Fullstack" + "."
             return jsonify({"error": error_message}), 400
