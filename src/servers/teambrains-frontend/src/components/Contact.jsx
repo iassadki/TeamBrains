@@ -43,12 +43,12 @@ const Contact = () => {
                         </div>
                         <div className="form-field">
                             <label className="form-label">Message</label>
-                            <textarea id='subject' placeholder="Votre message" className="input max-w-full" value={message} onChange={(e) => setMessage(e.target.value)} />
+                            <textarea placeholder="Votre message" className="input max-w-full" value={message} onChange={(e) => setMessage(e.target.value)} />
                             {/* <input placeholder="Votre message" type="text" className="input max-w-full" value={message} onChange={(e) => setMessage(e.target.value)} /> */}
                         </div>
                         <div className="form-field pt-5">
                             {/* {errorMessage && <div className="text-sm mb-2 text-red-500">{errorMessage}</div>} */}
-                            <div className="form-control justify-between">
+                            <div id='message' className="form-control justify-between">
                                 <button type="submit" className="btn btn-primary w-full">Envoyer</button>
                             </div>
                         </div>
