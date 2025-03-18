@@ -7,6 +7,8 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
+import SortBy from './SortBy';
+import Checkbox from './Checkbox';
 
 
 const Projects = () => {
@@ -17,6 +19,19 @@ const Projects = () => {
     const [isExpandedLangage, setIsExpandedLangage] = useState(true);
     const [sortOrder, setSortOrder] = useState('newest');
     const navigate = useNavigate();
+    const [selectedProfiles, setSelectedProfiles] = useState({
+        FullStack: false,
+        BackEnd: false,
+        FrontEnd: false,
+        Designer: false
+    });
+
+    const [selectedLanguages, setSelectedLanguages] = useState({
+        Javascript: false,
+        Python: false,
+        PHP: false,
+        Ruby: false
+    });
 
     const sortedProjects = projects.sort((a, b) => {
         if (sortOrder === 'newest') {
@@ -85,6 +100,24 @@ const Projects = () => {
         return formattedDate.replace(/^(.)|\s+(.)/g, c => c.toUpperCase());  // Capitalise chaque mot
     };
     
+    const filteredProjects = sortedProjects.filter(project => {
+        // Si aucun profil n'est sélectionné, on montre tous les projets
+        const hasSelectedProfiles = Object.values(selectedProfiles).some(value => value);
+        if (!hasSelectedProfiles) return true;
+
+        // On vérifie si au moins un des profils sélectionnés est disponible dans le projet
+        return Object.entries(selectedProfiles).some(([profile, isSelected]) => {
+            if (!isSelected) return false;
+            
+            // On vérifie si le profil est disponible dans le projet
+            const members = project.members || [];
+            const roleIsFree = !members.some(member => 
+                member.role.replace(/['"\\]+/g, '') === profile
+            );
+            
+            return roleIsFree;
+        });
+    });
     
     return (
         <div className="mx-12 p-12 flex">
@@ -106,23 +139,17 @@ const Projects = () => {
             
                     {isExpandedProfile && (
                         <div>
-                            {/* Liste des cases à cocher ici */}
-                            <label className="block mb-2">
-                                <input type="checkbox" className="mr-2" />
-                                FullStack
-                            </label>
-                            <label className="block mb-2">
-                                <input type="checkbox" className="mr-2" />
-                                BackEnd
-                            </label>
-                            <label className="block mb-2">
-                                <input type="checkbox" className="mr-2" />
-                                FrontEnd
-                            </label>
-                            <label className="block">
-                                <input type="checkbox" className="mr-2" />
-                                Designer
-                            </label>
+                            {Object.entries(selectedProfiles).map(([profile, checked]) => (
+                                <Checkbox
+                                    key={profile}
+                                    label={profile}
+                                    checked={checked}
+                                    onChange={() => setSelectedProfiles(prev => ({
+                                        ...prev,
+                                        [profile]: !prev[profile]
+                                    }))}
+                                />
+                            ))}
                         </div>
                     )}
                 </div>
@@ -139,22 +166,17 @@ const Projects = () => {
             
                     {isExpandedLangage && (
                         <div>
-                            <label className="block mb-2">
-                                <input type="checkbox" className="mr-2" />
-                                Javascript
-                            </label>
-                            <label className="block mb-2">
-                                <input type="checkbox" className="mr-2" />
-                                Python
-                            </label>
-                            <label className="block mb-2">
-                                <input type="checkbox" className="mr-2" />
-                                PHP
-                            </label>
-                            <label className="block">
-                                <input type="checkbox" className="mr-2" />
-                                Ruby
-                            </label>
+                            {Object.entries(selectedLanguages).map(([language, checked]) => (
+                                <Checkbox
+                                    key={language}
+                                    label={language}
+                                    checked={checked}
+                                    onChange={() => setSelectedLanguages(prev => ({
+                                        ...prev,
+                                        [language]: !prev[language]
+                                    }))}
+                                />
+                            ))}
                         </div>
                     )}
                 </div>
@@ -178,49 +200,49 @@ const Projects = () => {
                 </div>
                 
                 <div className='flex justify-between mb-2'>
-                    <p><span className='font-semibold text-green-tb'>{projects.length}</span> <span className='font-light'>projets</span></p>
-                    <div>
-                        <label className="mr-1" htmlFor="sortOrder">Trier par </label>
-                        <select className='border rounded-lg p-1' id="sortOrder" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
-                            <option value="newest">Le plus récent</option>
-                            <option value="oldest">Le plus ancien</option>
-                        </select>
-                    </div>
+                    <p>
+                        <span className='font-semibold text-green-tb'>{filteredProjects.length}</span>
+                        <span className='font-light'> projets</span>
+                    </p>
+                    <SortBy 
+                        value={sortOrder} 
+                        onChange={e => setSortOrder(e.target.value)} 
+                    />
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {sortedProjects.map((project) => {
-        const roles = mapRolesToMembers(project.members);
+                    {filteredProjects.map((project) => {
+                        const roles = mapRolesToMembers(project.members);
 
-        return (
-            <div
-                key={project.id}
-                className="cursor-pointer bg-white rounded-lg shadow p-5 transition duration-300 ease-in-out hover:shadow-lg hover:border-2 hover:border-green-500"
-                onClick={() => handleProjectClick(project.project_slug)}
-            >
-                <div className='flex items-center'>
-                    <span className={`inline-block h-2.5 w-2.5 mr-2 rounded-full ${
-                        project.status === 'in_progress' ? 'bg-orange-500' : project.status === 'not_started' ? 'bg-green-500' : 'bg-gray-500'
-                    }`}></span>
-                    <h2 className="font-bold text-xl">{project.name}</h2>
-                </div>
-                <p className="text-gray-500 text-base mb-2">{formatDate(project.creation_date)}</p>
-                <p className="text-gray-700 text-base mb-4">{project.description}</p>
-                <div>
-                    <h3 className="text-gray-800 font-semibold mb-1">Équipe</h3>
-                    <ul className='font-light text-sm'>
-                        {Object.entries(roles).map(([role, name]) => (
-                            <li key={role}>
-                                • {role}: {name === 'Disponible' ? <span className="text-green-500">{name}</span> : name}
-                            </li>
-                        ))}
-                    </ul>
+                        return (
+                            <div
+                                key={project.id}
+                                className="cursor-pointer bg-white rounded-lg shadow p-5 transition duration-300 ease-in-out hover:shadow-lg hover:border-2 hover:border-green-500"
+                                onClick={() => handleProjectClick(project.project_slug)}
+                            >
+                                <div className='flex items-center'>
+                                    <span className={`inline-block h-2.5 w-2.5 mr-2 rounded-full ${
+                                        project.status === 'in_progress' ? 'bg-orange-500' : project.status === 'not_started' ? 'bg-green-500' : 'bg-gray-500'
+                                    }`}></span>
+                                    <h2 className="font-bold text-xl">{project.name}</h2>
+                                </div>
+                                <p className="text-gray-500 text-base mb-2">{formatDate(project.creation_date)}</p>
+                                <p className="text-gray-700 text-base mb-4">{project.description}</p>
+                                <div>
+                                    <h3 className="text-gray-800 font-semibold mb-1">Équipe</h3>
+                                    <ul className='font-light text-sm'>
+                                        {Object.entries(roles).map(([role, name]) => (
+                                            <li key={role}>
+                                                • {role}: {name === 'Disponible' ? <span className="text-green-500">{name}</span> : name}
+                                            </li>
+                                        ))}
+                                    </ul>
 
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
-            </div>
-        );
-    })}
-</div>
             </div>
         </div>
     );
