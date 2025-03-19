@@ -123,12 +123,29 @@ def join_project(project_id):
     # Vérifiez si l'utilisateur est déjà membre du projet
     if db.session.query(project_members).filter_by(project_id=project_id, user_id=user_id).first():
         return jsonify({"error": "Utilisateur déjà membre du projet"}), 400
-
-    # Vérifiez si le rôle correspondant au type de développeur de l'utilisateur est disponible
+    
     role = user.typeDeveloppeur
-    existing_member = db.session.query(project_members).filter_by(project_id=project_id, role=role).first()
-    if existing_member:
-        return jsonify({"error": f"Le rôle {role} est déjà pris dans ce projet"}), 400
+
+    if role == "FullStack":
+        backend_existe = db.session.query(project_members).filter_by(project_id=project_id, role="BackEnd").first() is not None
+        frontend_existe = db.session.query(project_members).filter_by(project_id=project_id, role="FrontEnd").first() is not None
+        fullstack_existe = db.session.query(project_members).filter_by(project_id=project_id, role="FullStack").first() is not None
+
+        if fullstack_existe:
+            if backend_existe and frontend_existe:
+                return jsonify({"error": f"Tous les rôles sont déjà pris dans ce projet"}), 400
+            elif backend_existe:
+                role = "FrontEnd"
+            elif frontend_existe:
+                role = "BackEnd"     
+            else:
+                role = "BackEnd"
+        else:
+            role = "FullStack"
+    else:
+        existing_member = db.session.query(project_members).filter_by(project_id=project_id, role=role).first()
+        if existing_member:
+            return jsonify({"error": f"Le rôle {role} est déjà pris dans ce projet"}), 400
 
     # Ajoutez l'utilisateur au projet avec le rôle correspondant
     stmt = project_members.insert().values(project_id=project_id, user_id=user_id, role=role)
@@ -167,3 +184,24 @@ def delete_project(project_id):
     db.session.delete(project)
     db.session.commit()
     return jsonify({"message": "Projet supprimé avec succès"}), 200
+
+@projects.route('/start_project/<int:project_id>', methods=['POST'])
+@jwt_required()
+def start_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    member_roles = db.session.query(project_members.c.role).filter_by(project_id=project_id).all()
+    roles = [role for (role,) in member_roles]
+
+    if 'FullStack' in roles or ('BackEnd' in roles and 'FrontEnd' in roles):
+        project.status = "En cours"
+        db.session.commit()
+        return jsonify({"message": "Projet démarré avec succès"}), 200
+    else:
+        missing_roles = []
+        if 'BackEnd' in roles or 'FrontEnd' in roles:
+            if 'BackEnd' not in roles:
+                missing_roles.append("un BackEnd")
+            if 'FrontEnd' not in roles:
+                missing_roles.append("un FrontEnd")            
+            error_message = "Le projet ne peut être démarré car il manque les rôles nécessaires : " + ", ".join(missing_roles) + " ou un Fullstack" + "."
+            return jsonify({"error": error_message}), 400
