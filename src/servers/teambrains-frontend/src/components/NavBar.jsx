@@ -22,7 +22,7 @@ const NavBar = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        console.log(currentUser)
+        console.log(currentUser);
         // Fonction pour fermer les menus lors d'un clic à l'extérieur
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -56,6 +56,12 @@ const NavBar = () => {
     // Basculer l'état de la barre de recherche mobile
     const toggleSearch = () => {
         setIsSearchOpen(!isSearchOpen);
+    };
+
+    // Fonction pour passer du modal de connexion au modal d'inscription
+    const handleOpenSignUpFromSignIn = () => {
+        setIsSignInModalOpen(false);
+        setIsSignUpModalOpen(true);
     };
 
     return (
@@ -267,7 +273,10 @@ const NavBar = () => {
 
             {/* Modaux pour la connexion et l'inscription */}
             <Modal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} width="max-w-xl">
-                <SignIn onSuccessfulLogin={() => setIsSignInModalOpen(false)} />
+                <SignIn 
+                    onSuccessfulLogin={() => setIsSignInModalOpen(false)} 
+                    openSignUpModal={handleOpenSignUpFromSignIn}
+                />
             </Modal>
 
             <Modal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} width="max-w-4xl">
