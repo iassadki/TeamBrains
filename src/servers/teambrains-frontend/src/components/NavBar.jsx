@@ -3,16 +3,15 @@ import { NavLink } from 'react-router-dom';
 import logo from "../assets/logo_teambrains.svg";
 import { CircleUserRound, Menu, X, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import Modal from './Modal';
-import SignIn from './SignIn';
-import SignUp from './SignUp/Signup';
 import { useNavigate } from 'react-router-dom';
 
-const NavBar = () => {
+const NavBar = ({ 
+    openSignInModal, 
+    openSignUpModal, 
+    closeModals 
+}) => {
     // États pour gérer les différents éléments interactifs
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
-    const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -22,7 +21,7 @@ const NavBar = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        console.log(currentUser)
+        console.log(currentUser);
         // Fonction pour fermer les menus lors d'un clic à l'extérieur
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -131,13 +130,13 @@ const NavBar = () => {
                     ) : (
                         <>
                             <button
-                                onClick={() => setIsSignInModalOpen(true)}
+                                onClick={openSignInModal}
                                 className="text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
                             >
                                 Se connecter
                             </button>
                             <button
-                                onClick={() => setIsSignUpModalOpen(true)}
+                                onClick={openSignUpModal}
                                 className="bg-gray-800 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-600"
                             >
                                 S'inscrire
@@ -243,8 +242,8 @@ const NavBar = () => {
                             <>
                                 <button
                                     onClick={() => {
-                                        setIsSignInModalOpen(true);
                                         setIsMobileMenuOpen(false);
+                                        openSignInModal();
                                     }}
                                     className="text-left text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
                                 >
@@ -252,8 +251,8 @@ const NavBar = () => {
                                 </button>
                                 <button
                                     onClick={() => {
-                                        setIsSignUpModalOpen(true);
                                         setIsMobileMenuOpen(false);
+                                        openSignUpModal();
                                     }}
                                     className="text-left bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-600"
                                 >
@@ -264,15 +263,6 @@ const NavBar = () => {
                     </div>
                 </div>
             )}
-
-            {/* Modaux pour la connexion et l'inscription */}
-            <Modal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} width="max-w-xl">
-                <SignIn onSuccessfulLogin={() => setIsSignInModalOpen(false)} />
-            </Modal>
-
-            <Modal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} width="max-w-4xl">
-                <SignUp />
-            </Modal>
         </nav>
     );
 };

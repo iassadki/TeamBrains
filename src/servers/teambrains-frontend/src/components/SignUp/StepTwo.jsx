@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const StepTwo = ({ nextStep, prevStep, handleChange, values, submitForm }) => {
+const StepTwo = ({ nextStep, prevStep, handleChange, values, submitForm, personType }) => {
 
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -35,7 +35,12 @@ const StepTwo = ({ nextStep, prevStep, handleChange, values, submitForm }) => {
     <div className="flex flex-col items-center justify-center py-28">
       <div className="w-full max-w-xl">
         <form className="bg-white border border-gray-200 shadow-lg rounded-lg px-8 pt-6 pb-8 mb-4">
-          <h3 className="mb-4"><span className="text-xl font-bold">Inscription</span><span className='ml-2 rounded p-1 bg-gray-200 text-xs'>ÉTAPE 1/3</span></h3>
+          <h3 className="mb-4">
+            <span className="text-xl font-bold">Inscription</span>
+            {values.role === 'student' && (
+              <span className='ml-2 rounded p-1 bg-gray-200 text-xs'>ÉTAPE 1/3</span>
+            )}
+          </h3>
           
           {errorMessage && (
             <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
