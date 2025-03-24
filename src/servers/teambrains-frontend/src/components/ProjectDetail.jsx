@@ -100,6 +100,13 @@ const ProjectDetail = () => {
         return project.creator_id === currentUser.id;
     };
 
+    const canStartProject = () => {
+        if (!project) return false;
+        
+        const roles = project.members.map(member => member.role);
+        return roles.includes('FullStack') || (roles.includes('BackEnd') && roles.includes('FrontEnd'));
+    };
+
     useEffect(() => {
         fetchProject();
     }, [slug]);
@@ -134,10 +141,26 @@ const ProjectDetail = () => {
                                     Quitter l'équipe
                                 </button>
                             )}
-                            {checkCreator() && project.status === "not_started" && (
-                                <button className='mt-4 bg-green-600 text-white py-2 px-4 rounded-md' onClick={startProject}>
-                                    Lancer le projet
-                                </button>
+                            {checkCreator() && (
+                                <>
+                                    {project.status === "not_started" ? (
+                                        <>
+                                            {canStartProject() ? (
+                                                <button className='mt-4 bg-green-600 text-white py-2 px-4 rounded-md' onClick={startProject}>
+                                                    Lancer le projet
+                                                </button>
+                                            ) : (
+                                                <p className="mt-4 text-orange-600">
+                                                    Le projet ne peut pas encore démarrer. Il faut au minimum un développeur FullStack ou un BackEnd et un FrontEnd.
+                                                </p>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="mt-4 text-green-600 font-semibold">
+                                            ✓ Le projet est en cours de développement
+                                        </p>
+                                    )}
+                                </>
                             )}
                         </>
                     ) : (
