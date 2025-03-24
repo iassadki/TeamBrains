@@ -1,9 +1,10 @@
-import image1 from "../assets/image1.jpg"
-import image2 from "../assets/image2.jpg"
-import image3 from "../assets/image3.jpg"
+import React from 'react';
+import image1 from "../assets/image1.jpg";
+import image2 from "../assets/image2.jpg";
+import image3 from "../assets/image3.jpg";
 import { Zap } from 'lucide-react';
 
-const HomeContent = () => {
+const HomeContent = ({ openSignUpModal }) => {
     return (
         <div>
             {/* Section principale présentant TeamBrains */}
@@ -24,9 +25,12 @@ const HomeContent = () => {
                             <p className="font-montserrat">TeamBrains est une plateforme de mise en relation entre des entrepreneurs et des développeurs étudiants/apprenants. Ensemble, nous faisons naître des prototypes web et logiciels innovants.</p>
                         </div>
                         <div className="mt-4 flex justify-center md:justify-start">
-                            <a href="/signup" className="bg-green-tb py-2 px-4 text-white rounded mr-2">
+                            <button 
+                                onClick={openSignUpModal}
+                                className="bg-green-tb py-2 px-4 text-white rounded mr-2 cursor-pointer"
+                            >
                                 Nous rejoindre
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -75,9 +79,12 @@ const HomeContent = () => {
 
                 {/* Bouton d'appel à l'action */}
                 <div className="mt-8 font-poppins text-center mb-24">
-                    <a href="/signup" className="bg-green-tb py-2 px-4 text-white rounded mr-2">
+                    <button 
+                        onClick={openSignUpModal}
+                        className="bg-green-tb py-2 px-4 text-white rounded mr-2 cursor-pointer"
+                    >
                         Nous rejoindre
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
