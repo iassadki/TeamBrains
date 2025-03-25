@@ -5,10 +5,34 @@ const Contact = () => {
     const [email, setEmail] = useState('');
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
+    const [status, setStatus] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Form Data:', { name, email, message });
+        setStatus('sending');
+        
+        try {
+            const response = await fetch('http://localhost:5001/api/contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name, email, message }),
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                setStatus('success');
+                setName('');
+                setEmail('');
+                setMessage('');
+            } else {
+                setStatus('error');
+            }
+        } catch (error) {
+            setStatus('error');
+        }
     };
 
     return (
@@ -50,9 +74,27 @@ const Contact = () => {
                                     onChange={(e) => setMessage(e.target.value)}
                                 />
                             </div>
+                            {status === 'success' && (
+                                <div className="mt-4 p-2 bg-green-100 text-green-700 rounded">
+                                    Message envoyé avec succès !
+                                </div>
+                            )}
+                            
+                            {status === 'error' && (
+                                <div className="mt-4 p-2 bg-red-100 text-red-700 rounded">
+                                    Une erreur est survenue. Veuillez réessayer.
+                                </div>
+                            )}
+                            
                             <div className="form-field pt-3 md:pt-5">
                                 <div className="form-control justify-between">
-                                    <button type="submit" className="btn btn-primary w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">Envoyer</button>
+                                    <button 
+                                        type="submit" 
+                                        className="btn btn-primary w-full bg-green-500 text-white py-2 rounded hover:bg-green-600"
+                                        disabled={status === 'sending'}
+                                    >
+                                        {status === 'sending' ? 'Envoi en cours...' : 'Envoyer'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
