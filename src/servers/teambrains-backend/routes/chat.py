@@ -3,10 +3,10 @@ from models import db, Project, Message
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 
-chat_bp = Blueprint('chat', __name__)
+chat_bp = Blueprint('chat', __name__, url_prefix='/chat')
 
-@chat_bp.route('/chat/<int:project_id>', methods=['POST'])
-@jwt_required
+@chat_bp.route('/<int:project_id>/send', methods=['POST'])
+@jwt_required()
 def create_message(project_id):
     current_user_id = get_jwt_identity()
     data = request.json
@@ -32,8 +32,8 @@ def create_message(project_id):
         "message": message.to_dict()
     }), 201
 
-@chat_bp.route('/chat/<int:project_id>', methods=['GET'])
-@jwt_required
+@chat_bp.route('/<int:project_id>/messages', methods=['GET'])
+@jwt_required()
 def get_messages(project_id):
     project = Project.query.get(project_id)
     
