@@ -48,7 +48,7 @@ Naviguez jusqu'au répertoire dans lequel vous souhaitez cloner le projet. Utili
 
 ## Étape 3: Cloner le projet
 Vous pouvez maintenant cloner le projet à partir du dépôt GitHub. Utilisez la commande git clone pour cela :
-```git clone https://github.com/benribou/TeamBrains.git```
+```git clone https://github.com/iassadki/TeamBrains.git```
 
 Ceci clonera le projet dans le répertoire "MonProjet".
 
