@@ -15,10 +15,10 @@ const HeaderSection = () => {
                 {/* Conteneur des boutons - centrés sur mobile, alignés à gauche sur desktop */}
                 <div className="flex justify-center md:justify-start mt-4">
                     {/* Bouton principal blanc */}
-                    <button className="bg-white py-1 px-4 text-green-tb rounded mr-2">Découvrir</button>
+                    <button onClick={() => window.location.href = '/projets'} className="bg-white py-1 px-4 text-green-tb rounded mr-2">Découvrir</button>
 
                     {/* Bouton secondaire avec bordure */}
-                    <button className="border-2 py-1 px-4 text-white rounded mr-2">Contact</button>
+                    <button onClick={() => window.location.href = '/contact'} className="border-2 py-1 px-4 text-white rounded mr-2">Contact</button>
                 </div>
             </div>
 
