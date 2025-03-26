@@ -43,3 +43,23 @@ project_members = db.Table('project_members',
     db.Column('user_id', db.String(100), db.ForeignKey('users.id'), primary_key=True),  # Changez user_id en String
     db.Column('role', db.String(100), nullable=False) 
 )
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    sender_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'content': self.content,
+            'project_id': self.project_id,
+            'sender_id': self.sender_id,
+            'timestamp': self.timestamp.isoformat()
+        }
+    
+
