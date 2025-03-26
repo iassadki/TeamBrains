@@ -15,24 +15,12 @@ def create_project():
     user_id = get_jwt_identity()
     data = request.get_json()
     project_name = data.get('name')
-    end_date = data.get('endDate')
 
     project_slug = slugify(project_name)
 
     existing_project = Project.query.filter_by(name=project_name).first()
     if existing_project:
         return jsonify({"error": "Un projet avec ce nom existe déjà"}), 400
-
-    if end_date:
-        try:
-            end_date = parser.isoparse(end_date)
-            if end_date.tzinfo is not None:
-                end_date = end_date.astimezone(UTC).replace(tzinfo=None)
-
-            if end_date <= datetime.utcnow():
-                return jsonify({"error": "La date de fin de projet doit être future à la date d'aujourd'hui."}), 400
-        except ValueError:
-            return jsonify({"error": "Format de date invalide."}), 400
 
     new_project = Project(
         name=project_name,
