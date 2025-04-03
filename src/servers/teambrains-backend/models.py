@@ -63,3 +63,24 @@ class Message(db.Model):
         }
     
 
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    due_date = db.Column(db.DateTime, nullable=False)
+    percent_completion = db.Column(db.Integer, nullable=False, default=0)
+    assignee_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'due_date': self.due_date.isoformat(),
+            'percent_completion': self.percent_completion,
+            'assignee_id': self.assignee_id,
+            'project_id': self.project_id
+        }
