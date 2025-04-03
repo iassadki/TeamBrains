@@ -5,6 +5,7 @@ from models import db, User, Project
 from routes.auth import auth
 from routes.users import users
 from routes.projects import projects
+from routes.cv import cv_bp
 from dotenv import load_dotenv
 import os
 from extensions import bcrypt, mail
@@ -25,6 +26,7 @@ bcrypt.init_app(app)
 app.register_blueprint(auth, url_prefix='/auth')
 app.register_blueprint(users, url_prefix='/users')
 app.register_blueprint(projects, url_prefix='/projects')
+app.register_blueprint(cv_bp)
 app.register_blueprint(contact_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(planification_bp)
