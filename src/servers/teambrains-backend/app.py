@@ -12,6 +12,7 @@ from flask_jwt_extended import JWTManager
 from routes.contact import contact_bp
 from routes.chat import chat_bp
 from routes.planification import planification_bp
+from flask_migrate import Migrate
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +37,9 @@ app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = False
 
 db.init_app(app)
+
+# Initialiser Flask-Migrate
+migrate = Migrate(app, db)
 
 jwt = JWTManager(app)
 

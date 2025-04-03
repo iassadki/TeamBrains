@@ -35,6 +35,7 @@ class Project(db.Model):
     description = db.Column(db.Text, nullable=True)
     creator_id = db.Column(db.String(100), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     members = db.relationship('User', secondary='project_members', backref=db.backref('projects', lazy='dynamic'))
+    progress = db.Column(db.Integer, nullable=False, default=0, server_default='0')
 
 
 # Table associative pour les membres du projet

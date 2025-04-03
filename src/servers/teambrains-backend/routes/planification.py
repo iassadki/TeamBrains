@@ -4,6 +4,24 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 planification_bp = Blueprint('planification', __name__, url_prefix='/planification')
 
+def update_project_progress(project_id):
+    tasks = Task.query.filter_by(project_id=project_id).all()
+    
+    if not tasks:
+        return 0
+    
+    total_progress = sum(task.percent_completion for task in tasks)
+    total_tasks = len(tasks)
+    
+    project_progress = total_progress / total_tasks
+    
+    project = Project.query.get(project_id)
+    if project:
+        project.progress = project_progress
+        db.session.commit()
+    
+    return project_progress
+
 @planification_bp.route('/<int:project_id>/create_task', methods=['POST'])
 @jwt_required()
 def create_task(project_id):
@@ -28,6 +46,9 @@ def create_task(project_id):
 
     db.session.add(new_task)
     db.session.commit()
+    
+    # Mettre à jour la progression du projet
+    update_project_progress(project_id)
 
     return jsonify({
         "message": "Tâche créée avec succès",
@@ -64,10 +85,13 @@ def update_task(task_id):
     task.title = data['title']
     task.description = data['description'] if 'description' in data else None
     task.due_date = data['due_date']
-    task.percent_completion = data['percent_completion'] if 'percent_completion' in data else 0
+    task.percent_completion = data['percent_completion'] if 'percent_completion' in data else task.percent_completion
     task.assignee_id = data['assignee_id'] if 'assignee_id' in data else get_jwt_identity()
     
     db.session.commit()
+    
+    # Mettre à jour la progression du projet
+    update_project_progress(task.project_id)
 
     return jsonify({
         "message": "Tâche mise à jour avec succès",
@@ -82,7 +106,27 @@ def delete_task(task_id):
     if not task:
         return jsonify({"error": "La tâche spécifiée n'existe pas"}), 404
     
+    project_id = task.project_id
     db.session.delete(task)
     db.session.commit()
+    
+    # Mettre à jour la progression du projet
+    update_project_progress(project_id)
 
     return jsonify({"message": "Tâche supprimée avec succès"}), 200
+
+# Optionnel : Endpoint pour obtenir la progression d'un projet
+@planification_bp.route('/<int:project_id>/progress', methods=['GET'])
+@jwt_required()
+def get_project_progress(project_id):
+    project = Project.query.get(project_id)
+    
+    if not project:
+        return jsonify({"error": "Le projet spécifié n'existe pas"}), 404
+    
+    progress = update_project_progress(project_id)
+    
+    return jsonify({
+        "project_id": project_id,
+        "progress": progress
+    }), 200
