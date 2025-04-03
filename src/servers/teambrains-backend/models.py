@@ -22,6 +22,13 @@ class User(db.Model):
     # Une approche consiste à stocker les technologies comme une chaîne de texte séparée par des virgules.
 
     technologies = db.Column(db.String(255), nullable=True)
+    
+    # Nouveaux champs pour le profil
+    etudes = db.Column(db.Text, nullable=True)
+    ambitions = db.Column(db.Text, nullable=True)
+    linkedin_url = db.Column(db.String(255), nullable=True)
+    portfolio_url = db.Column(db.String(255), nullable=True)
+    github_url = db.Column(db.String(255), nullable=True)
 
 
 class Project(db.Model):
@@ -84,4 +91,31 @@ class Task(db.Model):
             'percent_completion': self.percent_completion,
             'assignee_id': self.assignee_id,
             'project_id': self.project_id
+        }
+
+class CVProject(db.Model):
+    __tablename__ = 'cv_projects'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(100), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id', ondelete='CASCADE'), nullable=False)
+    role = db.Column(db.String(100), nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False)
+    end_date = db.Column(db.DateTime, nullable=True)
+    team_size = db.Column(db.Integer, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    
+    project = db.relationship('Project', backref=db.backref('cv_projects', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'project_id': self.project_id,
+            'project_name': self.project.name,
+            'role': self.role,
+            'start_date': self.start_date.isoformat(),
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'team_size': self.team_size,
+            'description': self.description
         }

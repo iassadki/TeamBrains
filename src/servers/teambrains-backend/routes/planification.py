@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
-from models import db, Project, Task
+from models import db, User, Project, Task, CVProject
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from datetime import datetime
 
 planification_bp = Blueprint('planification', __name__, url_prefix='/planification')
 
@@ -21,6 +22,47 @@ def update_project_progress(project_id):
         db.session.commit()
     
     return project_progress
+
+def add_project_to_cv_if_completed(project_id, user_id):
+    # Vérifier si toutes les tâches du projet sont complétées
+    tasks = Task.query.filter_by(project_id=project_id).all()
+    if not tasks:
+        return False
+    
+    all_tasks_completed = all(task.percent_completion == 100 for task in tasks)
+    
+    if all_tasks_completed:
+        # Vérifier si le projet est déjà dans le CV
+        existing_cv_project = CVProject.query.filter_by(
+            user_id=user_id,
+            project_id=project_id
+        ).first()
+        
+        if not existing_cv_project:
+            project = Project.query.get(project_id)
+            if project:
+                # Récupérer le rôle de l'utilisateur dans le projet
+                member_role = db.session.query(project_members.c.role).filter_by(
+                    project_id=project_id,
+                    user_id=user_id
+                ).first()
+                
+                if member_role:
+                    role = member_role[0]
+                    # Ajouter le projet au CV
+                    new_cv_project = CVProject(
+                        user_id=user_id,
+                        project_id=project_id,
+                        role=role,
+                        start_date=project.creation_date,
+                        end_date=datetime.utcnow(),
+                        team_size=len(project.members),
+                        description=project.description
+                    )
+                    db.session.add(new_cv_project)
+                    db.session.commit()
+                    return True
+    return False
 
 @planification_bp.route('/<int:project_id>/create_task', methods=['POST'])
 @jwt_required()
@@ -92,6 +134,10 @@ def update_task(task_id):
     
     # Mettre à jour la progression du projet
     update_project_progress(task.project_id)
+    
+    # Vérifier si le projet doit être ajouté au CV
+    if task.percent_completion == 100:
+        add_project_to_cv_if_completed(task.project_id, task.assignee_id)
 
     return jsonify({
         "message": "Tâche mise à jour avec succès",

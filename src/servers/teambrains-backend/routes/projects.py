@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, Project, project_members
+from models import db, User, Project, project_members, CVProject
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from dateutil import parser
@@ -138,9 +138,26 @@ def join_project(project_id):
     # Ajoutez l'utilisateur au projet avec le rôle correspondant
     stmt = project_members.insert().values(project_id=project_id, user_id=user_id, role=role)
     db.session.execute(stmt)
+    
+    # Ajouter automatiquement le projet au CV
+    team_size = db.session.query(project_members).filter_by(project_id=project_id).count()
+    new_cv_project = CVProject(
+        user_id=user_id,
+        project_id=project_id,
+        role=role,
+        start_date=project.creation_date,
+        end_date=datetime.utcnow(),
+        team_size=team_size,
+        description=project.description
+    )
+    db.session.add(new_cv_project)
+    
     db.session.commit()
 
-    return jsonify({"message": "Utilisateur ajouté au projet avec succès"}), 200
+    return jsonify({
+        "message": "Utilisateur ajouté au projet avec succès et projet ajouté au CV",
+        "project": new_cv_project.to_dict()
+    }), 200
 
 @projects.route('/leave_project/<int:project_id>', methods=['POST'])
 @jwt_required()
