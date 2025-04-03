@@ -13,4 +13,17 @@ until PGPASSWORD=teambrains psql -h "$host" -U "teambrains" -d "teambrains" -c '
 done
 
 >&2 echo "Postgres is up - executing command"
+
+# Initialiser les migrations si le dossier est vide
+if [ -z "$(ls -A migrations)" ]; then
+    export FLASK_APP=app.py
+    flask db init
+fi
+
+# Créer et appliquer les migrations
+export FLASK_APP=app.py
+flask db migrate -m "add progress field to project"
+flask db upgrade
+
+# Exécuter la commande principale (python3 app.py)
 exec $cmd

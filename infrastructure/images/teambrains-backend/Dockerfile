@@ -18,18 +18,20 @@ RUN pip install flask-jwt-extended
 RUN pip install python-dateutil
 RUN pip install python-slugify
 RUN pip install flask-mail
-
+RUN pip install Flask-Migrate
 
 COPY /infrastructure/images/teambrains-backend/.env .
 COPY src/servers/teambrains-backend/ .
 
 RUN ls -l /app
 
+# Créer le dossier migrations
+RUN mkdir -p migrations
+
 RUN dos2unix /app/postgres.sh
 RUN chmod +x /app/postgres.sh
 
-
 EXPOSE 5001
 
-#CMD ["python3", "app.py"]
 CMD ["/app/postgres.sh", "teambrains-database", "python3", "app.py"]
+

@@ -11,6 +11,8 @@ from extensions import bcrypt, mail
 from flask_jwt_extended import JWTManager
 from routes.contact import contact_bp
 from routes.chat import chat_bp
+from routes.planification import planification_bp
+from flask_migrate import Migrate
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +27,7 @@ app.register_blueprint(users, url_prefix='/users')
 app.register_blueprint(projects, url_prefix='/projects')
 app.register_blueprint(contact_bp)
 app.register_blueprint(chat_bp)
+app.register_blueprint(planification_bp)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['JWT_SECRET_KEY'] = 'wdgQWWUKwT17lCz1'
@@ -34,6 +37,9 @@ app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = False
 
 db.init_app(app)
+
+# Initialiser Flask-Migrate
+migrate = Migrate(app, db)
 
 jwt = JWTManager(app)
 
