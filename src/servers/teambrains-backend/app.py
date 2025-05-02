@@ -14,6 +14,7 @@ from routes.contact import contact_bp
 from routes.chat import chat_bp
 from routes.planification import planification_bp
 from flask_migrate import Migrate
+from routes.uploadFile import upload_bp
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +31,7 @@ app.register_blueprint(cv_bp)
 app.register_blueprint(contact_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(planification_bp)
+app.register_blueprint(upload_bp)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['JWT_SECRET_KEY'] = 'wdgQWWUKwT17lCz1'
@@ -37,6 +39,8 @@ app.config['MAIL_SERVER'] = 'mailpit'
 app.config['MAIL_PORT'] = 1025
 app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = False
+app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limite la taille des fichiers à 16 Mo
 
 db.init_app(app)
 
