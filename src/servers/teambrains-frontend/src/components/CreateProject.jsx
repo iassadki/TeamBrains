@@ -85,15 +85,6 @@ const CreateProjectForm = ({ closeModal }) => {
                             <option value="in_progress">En cours</option>
                         </select>
                     </div>
-                    <div className="w-full sm:w-1/2 md:w-1/3 px-3 mt-6 sm:mt-0">
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="end_date">Date de fin de projet</label>
-                        <DatePicker
-                            selected={project.endDate}
-                            onChange={handleDateChange}
-                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                            wrapperClassName="w-full" // Assurez-vous que le wrapper prend toute la largeur
-                        />
-                    </div>
                 </div>
 
                 <div className="mt-4">

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, Project, project_members
+from models import db, User, Project, project_members, CVProject
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from dateutil import parser
@@ -15,24 +15,12 @@ def create_project():
     user_id = get_jwt_identity()
     data = request.get_json()
     project_name = data.get('name')
-    end_date = data.get('endDate')
 
     project_slug = slugify(project_name)
 
     existing_project = Project.query.filter_by(name=project_name).first()
     if existing_project:
         return jsonify({"error": "Un projet avec ce nom existe déjà"}), 400
-
-    if end_date:
-        try:
-            end_date = parser.isoparse(end_date)
-            if end_date.tzinfo is not None:
-                end_date = end_date.astimezone(UTC).replace(tzinfo=None)
-
-            if end_date <= datetime.utcnow():
-                return jsonify({"error": "La date de fin de projet doit être future à la date d'aujourd'hui."}), 400
-        except ValueError:
-            return jsonify({"error": "Format de date invalide."}), 400
 
     new_project = Project(
         name=project_name,
@@ -150,9 +138,26 @@ def join_project(project_id):
     # Ajoutez l'utilisateur au projet avec le rôle correspondant
     stmt = project_members.insert().values(project_id=project_id, user_id=user_id, role=role)
     db.session.execute(stmt)
+    
+    # Ajouter automatiquement le projet au CV
+    team_size = db.session.query(project_members).filter_by(project_id=project_id).count()
+    new_cv_project = CVProject(
+        user_id=user_id,
+        project_id=project_id,
+        role=role,
+        start_date=project.creation_date,
+        end_date=datetime.utcnow(),
+        team_size=team_size,
+        description=project.description
+    )
+    db.session.add(new_cv_project)
+    
     db.session.commit()
 
-    return jsonify({"message": "Utilisateur ajouté au projet avec succès"}), 200
+    return jsonify({
+        "message": "Utilisateur ajouté au projet avec succès et projet ajouté au CV",
+        "project": new_cv_project.to_dict()
+    }), 200
 
 @projects.route('/leave_project/<int:project_id>', methods=['POST'])
 @jwt_required()
