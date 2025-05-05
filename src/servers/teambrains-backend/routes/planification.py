@@ -83,13 +83,14 @@ def create_task(project_id):
         due_date=data['due_date'],
         project_id=project_id,
         percent_completion=0,
-        assignee_id=data['assignee_id'] if 'assignee_id' in data else get_jwt_identity()
+        assignee_id=data['assignee_id'] if 'assignee_id' in data else get_jwt_identity(),
+        priority=data['priority'] if 'priority' in data else 'moyenne',
+        sprint=data['sprint'] if 'sprint' in data else None
     )
 
     db.session.add(new_task)
     db.session.commit()
     
-    # Mettre à jour la progression du projet
     update_project_progress(project_id)
 
     return jsonify({
@@ -129,13 +130,13 @@ def update_task(task_id):
     task.due_date = data['due_date']
     task.percent_completion = data['percent_completion'] if 'percent_completion' in data else task.percent_completion
     task.assignee_id = data['assignee_id'] if 'assignee_id' in data else get_jwt_identity()
+    task.priority = data['priority'] if 'priority' in data else task.priority
+    task.sprint = data['sprint'] if 'sprint' in data else task.sprint
     
     db.session.commit()
     
-    # Mettre à jour la progression du projet
     update_project_progress(task.project_id)
     
-    # Vérifier si le projet doit être ajouté au CV
     if task.percent_completion == 100:
         add_project_to_cv_if_completed(task.project_id, task.assignee_id)
 
