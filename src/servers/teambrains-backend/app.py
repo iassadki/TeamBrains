@@ -16,6 +16,8 @@ from routes.planification import planification_bp
 from flask_migrate import Migrate
 from routes.uploadFile import upload_bp
 from routes.sprint import sprint_bp
+from routes.validation import validation_bp
+
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +36,7 @@ app.register_blueprint(chat_bp)
 app.register_blueprint(planification_bp)
 app.register_blueprint(upload_bp)
 app.register_blueprint(sprint_bp)
+app.register_blueprint(validation_bp)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['JWT_SECRET_KEY'] = 'wdgQWWUKwT17lCz1'

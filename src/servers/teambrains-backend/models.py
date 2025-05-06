@@ -45,10 +45,9 @@ class Project(db.Model):
     progress = db.Column(db.Integer, nullable=False, default=0, server_default='0')
 
 
-# Table associative pour les membres du projet
 project_members = db.Table('project_members',
-    db.Column('project_id', db.Integer, db.ForeignKey('projects.id'), primary_key=True),  # Conservez project_id comme Integer
-    db.Column('user_id', db.String(100), db.ForeignKey('users.id'), primary_key=True),  # Changez user_id en String
+    db.Column('project_id', db.Integer, db.ForeignKey('projects.id'), primary_key=True),
+    db.Column('user_id', db.String(100), db.ForeignKey('users.id'), primary_key=True),  
     db.Column('role', db.String(100), nullable=False) 
 )
 
@@ -153,4 +152,28 @@ class FileDocument(db.Model):
             'uploader_id': self.uploader_id,
             'project_id': self.project_id,
             'expiration_date': self.expiration_date.isoformat() if self.expiration_date else None
+        }
+    
+class TaskValidation(db.Model):
+    __tablename__ = 'task_validations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False)
+    status = db.Column(db.String(50), nullable=False) 
+    comment = db.Column(db.Text, nullable=True)
+    validator_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    task = db.relationship('Task', backref=db.backref('validations', lazy=True, cascade='all, delete-orphan'))
+    validator = db.relationship('User', backref=db.backref('task_validations', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'task_id': self.task_id,
+            'status': self.status,
+            'comment': self.comment,
+            'validator_id': self.validator_id,
+            'validator_name': f"{self.validator.prenom} {self.validator.nom}" if self.validator else "Inconnu",
+            'timestamp': self.timestamp.isoformat()
         }
