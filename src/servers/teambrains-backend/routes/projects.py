@@ -198,7 +198,7 @@ def start_project(project_id):
     roles = [role for (role,) in member_roles]
 
     if 'FullStack' in roles or ('BackEnd' in roles and 'FrontEnd' in roles):
-        project.status = "En cours"
+        project.status = "in_progress"
         db.session.commit()
         return jsonify({"message": "Projet démarré avec succès"}), 200
     else:
