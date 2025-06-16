@@ -57,15 +57,36 @@ const Chat = ({ projectId }) => {
         }
     };
 
+    // Fonction pour ajouter un fichier (placeholder pour l'instant)
+    const handleUpload = async (file, token, projectId = null) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (projectId) {
+            formData.append('project_id', projectId);
+        }
+
+        try {
+            const response = await axios.post('http://localhost:5000/upload/file', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            console.log('Fichier envoyé !', response.data);
+        } catch (error) {
+            console.error('Erreur lors de l\'upload', error.response?.data || error);
+        }
+    };
+
     // Fonction pour formater la date des messages
     const formatMessageDate = (timestamp) => {
         return format(new Date(timestamp), "d MMMM à HH:mm", { locale: fr });
     };
 
     // Scroll automatique vers le bas lorsque de nouveaux messages sont ajoutés
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    // useEffect(() => {
+    //     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // }, [messages]);
 
     // Récupération initiale des messages + mise en place du polling
     useEffect(() => {
@@ -104,8 +125,8 @@ const Chat = ({ projectId }) => {
                             >
                                 <div
                                     className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-lg ${message.sender_id === currentUser.id
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-gray-200 text-gray-800'
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-gray-200 text-gray-800'
                                         }`}
                                 >
                                     <div className="font-semibold">{message.sender_name}</div>
@@ -128,6 +149,7 @@ const Chat = ({ projectId }) => {
                         {error}
                     </div>
                 )}
+
                 <form onSubmit={sendMessage} className="flex items-center">
                     <input
                         type="text"
@@ -144,10 +166,19 @@ const Chat = ({ projectId }) => {
                         Send
                     </button>
 
-                    <button className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[5px]">
-                        <Paperclip className="w-4 h-4 mr-2" />
-                        Joindre un fichier
-                    </button>
+                    <input
+                        type="file"
+                        id="fileInput"
+                        className="hidden"
+                        onChange={(e) => handleUpload(e.target.files[0], token, projectId)}
+                    />
+
+                    <label htmlFor="fileInput">
+                        <div className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[5px] cursor-pointer">
+                            <Paperclip className="w-4 h-4 mr-2" />
+                            Joindre un fichier
+                        </div>
+                    </label>
                 </form>
             </div>
         </div>
