@@ -3,6 +3,7 @@ import axios from 'axios';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useAuth } from '../../../context/AuthContext';
+import { Paperclip } from 'lucide-react';
 
 const Chat = ({ projectId }) => {
     const [messages, setMessages] = useState([]);
@@ -140,7 +141,20 @@ const Chat = ({ projectId }) => {
                         className="px-4 py-2 bg-green-500 text-white rounded-r-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
                         disabled={!newMessage.trim()}
                     >
-                        Envoyer
+                        Send
+                    </button>
+
+                    {/* <button
+                        type="submit"
+                        className="px-4 py-2 bg-gray-200 text-black rounded-r-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[5px]"
+                        disabled={!newMessage.trim()}
+                    >
+                        Joindre un fichier
+                    </button> */}
+
+                    <button className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[5px]">
+                        <Paperclip className="w-4 h-4 mr-2" />
+                        Joindre un fichier
                     </button>
                 </form>
             </div>
