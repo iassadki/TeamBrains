@@ -58,25 +58,65 @@ const Chat = ({ projectId }) => {
     };
 
     // Fonction pour ajouter un fichier (placeholder pour l'instant)
-    const handleUpload = async (file, token, projectId = null) => {
+    const handleUpload = async (file, projectId = null) => {
+        const accessToken = localStorage.getItem('accessToken');
+
         const formData = new FormData();
         formData.append('file', file);
+
         if (projectId) {
             formData.append('project_id', projectId);
         }
 
         try {
-            const response = await axios.post('http://localhost:5000/upload/file', formData, {
+            const response = await axios.post('http://localhost:5001/upload/file', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${accessToken}`
                 }
             });
-            console.log('Fichier envoyé !', response.data);
+
+            const fileData = response.data.file;
+            const downloadUrl = fileData.download_url;
+            const fileName = fileData.filename;
+
+            console.log('Fichier envoyé !', fileData);
+
+            // Créer un message avec le lien du fichier
+            const fileMessage = {
+                id: Date.now(), // ID temporaire
+                sender_id: currentUser.id,
+                sender_name: currentUser.name,
+                content: '', // message vide, juste le fichier
+                file_url: downloadUrl,
+                file_name: fileName,
+                timestamp: new Date().toISOString(),
+            };
+
+            // Ajouter le nouveau message localement
+            const newMessages = [...messages, fileMessage];
+            setMessages(newMessages);
+
+            // Envoyer également le message au serveur
+            try {
+                await axios.post(`http://localhost:5001/chat/${projectId}/send`, {
+                    content: '',
+                    file_url: downloadUrl,
+                    file_name: fileName
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                });
+            } catch (err) {
+                console.error("Erreur lors de l'envoi du message avec fichier:", err);
+            }
+
         } catch (error) {
             console.error('Erreur lors de l\'upload', error.response?.data || error);
         }
     };
+
 
     // Fonction pour formater la date des messages
     const formatMessageDate = (timestamp) => {
@@ -131,12 +171,54 @@ const Chat = ({ projectId }) => {
                                 >
                                     <div className="font-semibold">{message.sender_name}</div>
                                     <p className="text-sm break-words">{message.content}</p>
+
+                                    {/* Affichage du message (Ilias) */}
+                                    {message.file_url && (
+                                        <div className="mt-2">
+                                            {message.file_name &&
+                                                /\.(jpg|jpeg|png|gif|webp)$/i.test(message.file_name) ? (
+                                                <div className="mt-2">
+                                                    <img
+                                                        src={message.file_url}
+                                                        alt={message.file_name}
+                                                        className="max-w-full rounded-md max-h-48 object-contain mb-1"
+                                                    />
+                                                    <a
+                                                        href={message.file_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className={`text-xs underline mt-1 block ${message.sender_id === currentUser.id
+                                                                ? 'text-white opacity-80'
+                                                                : 'text-blue-600'
+                                                            }`}
+                                                    >
+                                                        Télécharger l'image
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <a
+                                                    href={message.file_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className={`text-sm underline mt-1 block ${message.sender_id === currentUser.id
+                                                            ? 'text-white opacity-80'
+                                                            : 'text-blue-600'
+                                                        }`}
+                                                >
+                                                    Télécharger {message.file_name || 'le fichier'}
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="text-xs mt-1 text-right opacity-75">
                                         {formatMessageDate(message.timestamp)}
                                     </div>
                                 </div>
                             </div>
                         ))}
+                        {/* Fin affichage message (Ilias) */}
+
                         <div ref={messagesEndRef} />
                     </>
                 )}
@@ -170,7 +252,7 @@ const Chat = ({ projectId }) => {
                         type="file"
                         id="fileInput"
                         className="hidden"
-                        onChange={(e) => handleUpload(e.target.files[0], token, projectId)}
+                        onChange={(e) => handleUpload(e.target.files[0], projectId)}
                     />
 
                     <label htmlFor="fileInput">
