@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { PlusCircle, Edit2, Trash2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
@@ -25,6 +24,8 @@ const TaskBoard = () => {
     });
     const [projectMembers, setProjectMembers] = useState([]);
     const [error, setError] = useState(null);
+    const [draggedTask, setDraggedTask] = useState(null);
+    const [projectProgress, setProjectProgress] = useState(0);
 
     // États pour organiser les tâches en colonnes
     const [columns, setColumns] = useState({
@@ -87,6 +88,21 @@ const TaskBoard = () => {
         fetchTasks();
     }, [project]);
 
+    // Calcul de la progression du projet basée sur les tâches
+    const calculateProjectProgress = (tasksList) => {
+        if (tasksList.length === 0) {
+            setProjectProgress(0);
+            return;
+        }
+
+        const totalCompletion = tasksList.reduce((sum, task) => {
+            return sum + (task.percent_completion || 0);
+        }, 0);
+
+        const averageProgress = totalCompletion / tasksList.length;
+        setProjectProgress(Math.round(averageProgress));
+    };
+
     // Organisation des tâches en colonnes selon leur avancement
     const organizeTasks = (tasksList) => {
         const taskColumns = {
@@ -115,6 +131,79 @@ const TaskBoard = () => {
         });
 
         setColumns(taskColumns);
+        
+        // Calculer la progression du projet à chaque réorganisation
+        calculateProjectProgress(tasksList);
+    };
+
+    // Gestion du drag and drop natif
+    const handleDragStart = (e, task, sourceColumn) => {
+        setDraggedTask({ task, sourceColumn });
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', e.target.outerHTML);
+        e.target.style.opacity = '0.5';
+    };
+
+    const handleDragEnd = (e) => {
+        e.target.style.opacity = '1';
+        setDraggedTask(null);
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = async (e, targetColumn) => {
+        e.preventDefault();
+        
+        if (!draggedTask || draggedTask.sourceColumn === targetColumn) {
+            return;
+        }
+
+        const { task, sourceColumn } = draggedTask;
+        
+        // Mise à jour du pourcentage d'avancement selon la colonne de destination
+        let newPercentCompletion = task.percent_completion;
+
+        if (targetColumn === 'to-do') {
+            newPercentCompletion = 0;
+        } else if (targetColumn === 'in-progress') {
+            newPercentCompletion = 50;
+        } else if (targetColumn === 'done') {
+            newPercentCompletion = 100;
+        }
+
+        try {
+            const payload = {
+                title: task.title,
+                description: task.description || '',
+                due_date: task.due_date,
+                assignee_id: task.assignee_id,
+                percent_completion: newPercentCompletion
+            };
+
+            await axios.put(
+                `http://localhost:5001/planification/${task.id}/update`,
+                payload,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                }
+            );
+
+            // Mise à jour de l'état local
+            const updatedTasks = tasks.map(t =>
+                t.id === task.id ? { ...t, percent_completion: newPercentCompletion } : t
+            );
+            setTasks(updatedTasks);
+            organizeTasks(updatedTasks);
+
+        } catch (error) {
+            console.error('Erreur lors de la mise à jour de la tâche:', error);
+            setError("Impossible de mettre à jour le statut de la tâche");
+        }
     };
 
     // Gestion du formulaire
@@ -255,97 +344,6 @@ const TaskBoard = () => {
         setShowEditForm(true);
     };
 
-    // Gestion du drag and drop
-    const onDragEnd = async (result) => {
-        if (!result.destination) return;
-
-        const { source, destination, draggableId } = result;
-
-        if (source.droppableId === destination.droppableId) {
-            // Réorganisation dans la même colonne
-            const column = columns[source.droppableId];
-            const copiedItems = [...column.items];
-            const [removed] = copiedItems.splice(source.index, 1);
-            copiedItems.splice(destination.index, 0, removed);
-
-            setColumns({
-                ...columns,
-                [source.droppableId]: {
-                    ...column,
-                    items: copiedItems
-                }
-            });
-        } else {
-            // Changement de colonne = changement de statut
-            const sourceColumn = columns[source.droppableId];
-            const destColumn = columns[destination.droppableId];
-            const sourceItems = [...sourceColumn.items];
-            const destItems = [...destColumn.items];
-            const [removed] = sourceItems.splice(source.index, 1);
-
-            // Mise à jour du pourcentage d'avancement selon la colonne de destination
-            let newPercentCompletion = removed.percent_completion;
-
-            if (destination.droppableId === 'to-do') {
-                newPercentCompletion = 0;
-            } else if (destination.droppableId === 'in-progress') {
-                newPercentCompletion = 50; // Valeur par défaut pour "En cours"
-            } else if (destination.droppableId === 'done') {
-                newPercentCompletion = 100;
-            }
-
-            // Mise à jour de la tâche dans l'API
-            try {
-                const taskToUpdate = { ...removed, percent_completion: newPercentCompletion };
-                const payload = {
-                    title: taskToUpdate.title,
-                    description: taskToUpdate.description || '',
-                    due_date: taskToUpdate.due_date,
-                    assignee_id: taskToUpdate.assignee_id,
-                    percent_completion: newPercentCompletion
-                };
-
-                await axios.put(
-                    `http://localhost:5001/planification/${taskToUpdate.id}/update`,
-                    payload,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                        }
-                    }
-                );
-
-                // Mise à jour de l'élément avant de l'ajouter à la nouvelle colonne
-                removed.percent_completion = newPercentCompletion;
-                destItems.splice(destination.index, 0, removed);
-
-                setColumns({
-                    ...columns,
-                    [source.droppableId]: {
-                        ...sourceColumn,
-                        items: sourceItems
-                    },
-                    [destination.droppableId]: {
-                        ...destColumn,
-                        items: destItems
-                    }
-                });
-
-                // Mettre à jour la liste de tâches
-                const updatedTasks = tasks.map(task =>
-                    task.id === removed.id ? { ...task, percent_completion: newPercentCompletion } : task
-                );
-                setTasks(updatedTasks);
-
-            } catch (error) {
-                console.error('Erreur lors de la mise à jour de la tâche:', error);
-                setError("Impossible de mettre à jour le statut de la tâche");
-                // Rétablir l'état précédent en cas d'erreur
-                organizeTasks(tasks);
-            }
-        }
-    };
-
     // Format de date pour l'affichage
     const formatDate = (dateString) => {
         try {
@@ -389,14 +387,33 @@ const TaskBoard = () => {
             {project && (
                 <div className="mb-6 bg-white p-4 rounded-lg shadow">
                     <h3 className="text-lg font-medium mb-2">Progression du projet</h3>
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">
+                            {tasks.length} tâche{tasks.length > 1 ? 's' : ''} au total
+                        </span>
+                        <span className="text-sm font-medium text-gray-700">
+                            {projectProgress}% complété
+                        </span>
+                    </div>
                     <div className="w-full bg-gray-200 rounded-full h-4">
                         <div
-                            className="bg-green-500 h-4 rounded-full"
-                            style={{ width: `${project.progress || 0}%` }}
+                            className="bg-green-500 h-4 rounded-full transition-all duration-300"
+                            style={{ width: `${projectProgress}%` }}
                         ></div>
                     </div>
-                    <div className="text-right mt-1 text-sm text-gray-600">
-                        {Math.round(project.progress || 0)}% complété
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-gray-500">
+                        <div className="text-center">
+                            <div className="font-medium text-red-600">{columns['to-do']?.items.length || 0}</div>
+                            <div>À faire</div>
+                        </div>
+                        <div className="text-center">
+                            <div className="font-medium text-yellow-600">{columns['in-progress']?.items.length || 0}</div>
+                            <div>En cours</div>
+                        </div>
+                        <div className="text-center">
+                            <div className="font-medium text-green-600">{columns['done']?.items.length || 0}</div>
+                            <div>Terminées</div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -561,93 +578,84 @@ const TaskBoard = () => {
                 </div>
             )}
 
-            {/* Tableau Kanban */}
-            <DragDropContext onDragEnd={onDragEnd}>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {Object.entries(columns).map(([columnId, column]) => (
-                        <div key={columnId} className="bg-white p-3 rounded-lg shadow">
-                            <h3 className="font-medium text-lg mb-3 flex items-center">
-                                <span
-                                    className={`inline-block h-3 w-3 rounded-full mr-2 ${columnId === 'to-do' ? 'bg-red-500' :
-                                            columnId === 'in-progress' ? 'bg-yellow-500' : 'bg-green-500'
-                                        }`}
-                                ></span>
-                                {column.name}
-                                <span className="ml-2 text-gray-500 text-sm">({column.items.length})</span>
-                            </h3>
-                            <Droppable droppableId={columnId}>
-                                {(provided, snapshot) => (
-                                    <div
-                                        {...provided.droppableProps}
-                                        ref={provided.innerRef}
-                                        className={`min-h-[300px] transition-colors ${snapshot.isDraggingOver ? 'bg-gray-50' : ''
-                                            }`}
-                                    >
-                                        {column.items.map((task, index) => (
-                                            <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
-                                                {(provided, snapshot) => (
-                                                    <div
-                                                        ref={provided.innerRef}
-                                                        {...provided.draggableProps}
-                                                        {...provided.dragHandleProps}
-                                                        className={`p-3 mb-2 rounded-md border-l-4 bg-white shadow-sm ${snapshot.isDragging ? 'shadow-md' : ''
-                                                            } ${columnId === 'to-do' ? 'border-red-500' :
-                                                                columnId === 'in-progress' ? 'border-yellow-500' : 'border-green-500'
-                                                            }`}
-                                                    >
-                                                        <div className="flex justify-between items-start">
-                                                            <h4 className="font-medium">{task.title}</h4>
-                                                            <div className="flex">
-                                                                <button
-                                                                    onClick={() => openEditForm(task)}
-                                                                    className="text-gray-500 hover:text-blue-500 mr-2"
-                                                                >
-                                                                    <Edit2 size={16} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteTask(task.id)}
-                                                                    className="text-gray-500 hover:text-red-500"
-                                                                >
-                                                                    <Trash2 size={16} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        {task.description && (
-                                                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">{task.description}</p>
-                                                        )}
-                                                        <div className="flex justify-between mt-3 text-xs text-gray-500">
-                                                            <div>
-                                                                Assigné: {getMemberName(task.assignee_id)}
-                                                            </div>
-                                                            <div>
-                                                                {formatDate(task.due_date)}
-                                                            </div>
-                                                        </div>
-                                                        {columnId === 'in-progress' && (
-                                                            <div className="mt-2">
-                                                                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                                                    <div
-                                                                        className="bg-yellow-500 h-1.5 rounded-full"
-                                                                        style={{ width: `${task.percent_completion}%` }}
-                                                                    ></div>
-                                                                </div>
-                                                                <div className="text-right mt-0.5 text-xs text-gray-500">
-                                                                    {task.percent_completion}%
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </Draggable>
-                                        ))}
-                                        {provided.placeholder}
+            {/* Tableau Kanban avec drag & drop natif */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Object.entries(columns).map(([columnId, column]) => (
+                    <div 
+                        key={columnId} 
+                        className="bg-white p-3 rounded-lg shadow"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, columnId)}
+                    >
+                        <h3 className="font-medium text-lg mb-3 flex items-center">
+                            <span
+                                className={`inline-block h-3 w-3 rounded-full mr-2 ${
+                                    columnId === 'to-do' ? 'bg-red-500' :
+                                    columnId === 'in-progress' ? 'bg-yellow-500' : 'bg-green-500'
+                                }`}
+                            ></span>
+                            {column.name}
+                            <span className="ml-2 text-gray-500 text-sm">({column.items.length})</span>
+                        </h3>
+                        <div className="min-h-[300px]">
+                            {column.items.map((task) => (
+                                <div
+                                    key={task.id}
+                                    draggable="true"
+                                    onDragStart={(e) => handleDragStart(e, task, columnId)}
+                                    onDragEnd={handleDragEnd}
+                                    className={`p-3 mb-2 rounded-md border-l-4 bg-white shadow-sm cursor-move transition-shadow hover:shadow-md ${
+                                        columnId === 'to-do' ? 'border-red-500' :
+                                        columnId === 'in-progress' ? 'border-yellow-500' : 'border-green-500'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <h4 className="font-medium">{task.title}</h4>
+                                        <div className="flex">
+                                            <button
+                                                onClick={() => openEditForm(task)}
+                                                className="text-gray-500 hover:text-blue-500 mr-2"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteTask(task.id)}
+                                                className="text-gray-500 hover:text-red-500"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
-                                )}
-                            </Droppable>
+                                    {task.description && (
+                                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{task.description}</p>
+                                    )}
+                                    <div className="flex justify-between mt-3 text-xs text-gray-500">
+                                        <div>
+                                            Assigné: {getMemberName(task.assignee_id)}
+                                        </div>
+                                        <div>
+                                            {formatDate(task.due_date)}
+                                        </div>
+                                    </div>
+                                    {columnId === 'in-progress' && (
+                                        <div className="mt-2">
+                                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                                <div
+                                                    className="bg-yellow-500 h-1.5 rounded-full"
+                                                    style={{ width: `${task.percent_completion}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="text-right mt-0.5 text-xs text-gray-500">
+                                                {task.percent_completion}%
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
-            </DragDropContext>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
