@@ -80,7 +80,7 @@ class Task(db.Model):
     percent_completion = db.Column(db.Integer, nullable=False, default=0)
     assignee_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    priority = db.Column(db.String(20), nullable=False, default='moyenne')  
+    priority = db.Column(db.String(20), nullable=True, default='moyenne')  
     sprint = db.Column(db.String(100), nullable=True) 
     
     def to_dict(self):
