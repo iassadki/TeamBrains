@@ -69,6 +69,7 @@ const Chat = ({ projectId }) => {
         }
 
         try {
+            // 1. Uploader le fichier
             const response = await axios.post('http://localhost:5001/upload/file', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
@@ -82,41 +83,25 @@ const Chat = ({ projectId }) => {
 
             console.log('Fichier envoyé !', fileData);
 
-            // Créer un message avec le lien du fichier
-            const fileMessage = {
-                id: Date.now(), // ID temporaire
-                sender_id: currentUser.id,
-                sender_name: currentUser.name,
-                content: '', // message vide, juste le fichier
+            // 2. Envoyer le message avec les informations du fichier au serveur
+            await axios.post(`http://localhost:5001/chat/${projectId}/send`, {
+                content: '', // message vide pour les fichiers
                 file_url: downloadUrl,
-                file_name: fileName,
-                timestamp: new Date().toISOString(),
-            };
+                file_name: fileName
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
 
-            // Ajouter le nouveau message localement
-            const newMessages = [...messages, fileMessage];
-            setMessages(newMessages);
-
-            // Envoyer également le message au serveur
-            try {
-                await axios.post(`http://localhost:5001/chat/${projectId}/send`, {
-                    content: '',
-                    file_url: downloadUrl,
-                    file_name: fileName
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                    }
-                });
-            } catch (err) {
-                console.error("Erreur lors de l'envoi du message avec fichier:", err);
-            }
+            // 3. Récupérer les messages mis à jour
+            await fetchMessages();
 
         } catch (error) {
             console.error('Erreur lors de l\'upload', error.response?.data || error);
+            setError("Erreur lors de l'envoi du fichier");
         }
     };
-
 
     // Fonction pour formater la date des messages
     const formatMessageDate = (timestamp) => {
@@ -124,9 +109,9 @@ const Chat = ({ projectId }) => {
     };
 
     // Scroll automatique vers le bas lorsque de nouveaux messages sont ajoutés
-    // useEffect(() => {
-    //     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    // }, [messages]);
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     // Récupération initiale des messages + mise en place du polling
     useEffect(() => {
@@ -138,7 +123,13 @@ const Chat = ({ projectId }) => {
                 fetchMessages();
             }, 5000);
 
-            return () => clearInterval(interval);
+            // Stocker l'interval dans une référence globale pour le contrôle
+            window.chatPollingInterval = interval;
+
+            return () => {
+                clearInterval(interval);
+                window.chatPollingInterval = null;
+            };
         }
     }, [projectId]);
 
@@ -170,9 +161,13 @@ const Chat = ({ projectId }) => {
                                         }`}
                                 >
                                     <div className="font-semibold">{message.sender_name}</div>
-                                    <p className="text-sm break-words">{message.content}</p>
 
-                                    {/* Affichage du message (Ilias) */}
+                                    {/* Affichage du contenu texte seulement s'il existe */}
+                                    {message.content && (
+                                        <p className="text-sm break-words">{message.content}</p>
+                                    )}
+
+                                    {/* Affichage de la pièce jointe */}
                                     {message.file_url && (
                                         <div className="mt-2">
                                             {message.file_name &&
@@ -188,8 +183,8 @@ const Chat = ({ projectId }) => {
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className={`text-xs underline mt-1 block ${message.sender_id === currentUser.id
-                                                                ? 'text-white opacity-80'
-                                                                : 'text-blue-600'
+                                                            ? 'text-white opacity-80'
+                                                            : 'text-blue-600'
                                                             }`}
                                                     >
                                                         Télécharger l'image
@@ -201,8 +196,8 @@ const Chat = ({ projectId }) => {
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className={`text-sm underline mt-1 block ${message.sender_id === currentUser.id
-                                                            ? 'text-white opacity-80'
-                                                            : 'text-blue-600'
+                                                        ? 'text-white opacity-80'
+                                                        : 'text-blue-600'
                                                         }`}
                                                 >
                                                     Télécharger {message.file_name || 'le fichier'}
@@ -217,7 +212,6 @@ const Chat = ({ projectId }) => {
                                 </div>
                             </div>
                         ))}
-                        {/* Fin affichage message (Ilias) */}
 
                         <div ref={messagesEndRef} />
                     </>
