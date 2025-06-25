@@ -5,8 +5,9 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { Paperclip } from 'lucide-react';
 
-const TaskBoard = () => {
+const TaskBoard = (projectId) => {
     const { slug } = useParams();
     const { currentUser } = useAuth();
     const [project, setProject] = useState(null);
@@ -360,6 +361,88 @@ const TaskBoard = () => {
         return member ? member.name : "Non assigné";
     };
 
+    // Fonction pour ajouter un fichier
+    const handleUpload = async (file, taskId = null) => {
+        const accessToken = localStorage.getItem('accessToken');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        if (project) {
+            formData.append('project_id', project.id);
+        }
+
+        try {
+            const response = await axios.post('http://localhost:5001/upload/file', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            const fileData = response.data.file;
+            const downloadUrl = fileData.download_url;
+            const fileName = fileData.filename;
+
+            console.log('Fichier envoyé !', fileData);
+
+            // Si nous sommes en train de créer/modifier une tâche
+            if (showCreateForm || showEditForm) {
+                // Stocker temporairement l'URL du fichier dans formData
+                setFormData({
+                    ...formData,
+                    file_url: downloadUrl,
+                    file_name: fileName
+                });
+
+                // Afficher un message de confirmation
+                alert(`Fichier "${fileName}" attaché avec succès. Il sera lié à la tâche après enregistrement.`);
+            }
+            // Si nous avons un ID de tâche spécifique, mettre à jour directement cette tâche
+            else if (taskId) {
+                // Trouver la tâche actuelle
+                const taskToUpdate = tasks.find(t => t.id === taskId);
+
+                if (taskToUpdate) {
+                    // Préparer les données de mise à jour
+                    const payload = {
+                        title: taskToUpdate.title,
+                        description: taskToUpdate.description || '',
+                        due_date: taskToUpdate.due_date,
+                        assignee_id: taskToUpdate.assignee_id,
+                        percent_completion: taskToUpdate.percent_completion,
+                        file_url: downloadUrl,
+                        file_name: fileName
+                    };
+
+                    // Appel API pour mettre à jour la tâche
+                    const response = await axios.put(
+                        `http://localhost:5001/planification/${taskId}/update`,
+                        payload,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                            }
+                        }
+                    );
+
+                    // Mettre à jour l'état local
+                    const updatedTask = response.data.task;
+                    const updatedTasks = tasks.map(t =>
+                        t.id === updatedTask.id ? updatedTask : t
+                    );
+                    setTasks(updatedTasks);
+                    organizeTasks(updatedTasks);
+
+                    alert(`Fichier "${fileName}" attaché à la tâche.`);
+                }
+            }
+        } catch (error) {
+            console.error('Erreur lors de l\'upload', error.response?.data || error);
+            alert("Erreur lors de l'envoi du fichier.");
+        }
+    };
+
     if (loading) {
         return <div className="flex justify-center items-center h-full">Chargement des tâches...</div>;
     }
@@ -472,6 +555,23 @@ const TaskBoard = () => {
                                     ))}
                                 </select>
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Joindre un fichier</label>
+                                <input
+                                    type="file"
+                                    id="fileInput"
+                                    className="hidden"
+                                    onChange={(e) => handleUpload(e.target.files[0], projectId)}
+                                />
+
+                                <label htmlFor="fileInput">
+                                    <div className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[5px] cursor-pointer">
+                                        <Paperclip className="w-4 h-4 mr-2" />
+                                        Sélectionner un fichier
+                                    </div>
+                                </label>
+
+                            </div>
                         </div>
                         <div className="mt-4 flex justify-end">
                             <button
@@ -545,6 +645,23 @@ const TaskBoard = () => {
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Joindre un fichier</label>
+                                <input
+                                    type="file"
+                                    id="fileInput"
+                                    className="hidden"
+                                    onChange={(e) => handleUpload(e.target.files[0], projectId)}
+                                />
+
+                                <label htmlFor="fileInput">
+                                    <div className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[5px] cursor-pointer">
+                                        <Paperclip className="w-4 h-4 mr-2" />
+                                        Sélectionner un fichier
+                                    </div>
+                                </label>
+
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Progression (%)</label>

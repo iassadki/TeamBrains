@@ -57,7 +57,7 @@ const Chat = ({ projectId }) => {
         }
     };
 
-    // Fonction pour ajouter un fichier (placeholder pour l'instant)
+    // Fonction pour ajouter un fichier
     const handleUpload = async (file, projectId = null) => {
         const accessToken = localStorage.getItem('accessToken');
 
