@@ -88,6 +88,11 @@ class Task(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     priority = db.Column(db.String(20), nullable=True, default='moyenne')  
     sprint = db.Column(db.String(100), nullable=True) 
+
+    # Nouveaux champs pour les pièces jointes
+    file_url = db.Column(db.Text, nullable=True)
+    file_name = db.Column(db.String(255), nullable=True)
+
     
     def to_dict(self):
         return {
@@ -99,7 +104,9 @@ class Task(db.Model):
             'assignee_id': self.assignee_id,
             'project_id': self.project_id,
             'priority': self.priority,
-            'sprint': self.sprint
+            'sprint': self.sprint,
+            'file_url': self.file_url,
+            'file_name': self.file_name
         }
 
 class CVProject(db.Model):

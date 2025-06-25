@@ -21,7 +21,9 @@ const TaskBoard = (projectId) => {
         description: '',
         due_date: '',
         assignee_id: '',
-        percent_completion: 0
+        percent_completion: 0,
+        file_url: '',
+        file_name: ''
     });
     const [projectMembers, setProjectMembers] = useState([]);
     const [error, setError] = useState(null);
@@ -132,7 +134,7 @@ const TaskBoard = (projectId) => {
         });
 
         setColumns(taskColumns);
-        
+
         // Calculer la progression du projet à chaque réorganisation
         calculateProjectProgress(tasksList);
     };
@@ -157,13 +159,13 @@ const TaskBoard = (projectId) => {
 
     const handleDrop = async (e, targetColumn) => {
         e.preventDefault();
-        
+
         if (!draggedTask || draggedTask.sourceColumn === targetColumn) {
             return;
         }
 
         const { task, sourceColumn } = draggedTask;
-        
+
         // Mise à jour du pourcentage d'avancement selon la colonne de destination
         let newPercentCompletion = task.percent_completion;
 
@@ -181,7 +183,9 @@ const TaskBoard = (projectId) => {
                 description: task.description || '',
                 due_date: task.due_date,
                 assignee_id: task.assignee_id,
-                percent_completion: newPercentCompletion
+                percent_completion: newPercentCompletion,
+                file_url: task.file_url,
+                file_name: task.file_name
             };
 
             await axios.put(
@@ -216,6 +220,46 @@ const TaskBoard = (projectId) => {
         });
     };
 
+    // Fonction pour ajouter un fichier
+    const handleUpload = async (file) => {
+        const accessToken = localStorage.getItem('accessToken');
+
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', file);
+
+        if (project) {
+            formDataUpload.append('project_id', project.id);
+        }
+
+        try {
+            const response = await axios.post('http://localhost:5001/upload/file', formDataUpload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            const fileData = response.data.file;
+            const downloadUrl = fileData.download_url;
+            const fileName = fileData.filename;
+
+            console.log('Fichier envoyé !', fileData);
+
+            // Mettre à jour formData avec les informations du fichier
+            setFormData(prevFormData => ({
+                ...prevFormData,
+                file_url: downloadUrl,
+                file_name: fileName
+            }));
+
+            alert(`Fichier "${fileName}" attaché avec succès. Il sera lié à la tâche après enregistrement.`);
+
+        } catch (error) {
+            console.error('Erreur lors de l\'upload', error.response?.data || error);
+            alert("Erreur lors de l'envoi du fichier.");
+        }
+    };
+
     // Création d'une nouvelle tâche
     const handleCreateTask = async (e) => {
         e.preventDefault();
@@ -225,8 +269,12 @@ const TaskBoard = (projectId) => {
                 title: formData.title,
                 description: formData.description,
                 due_date: formData.due_date,
-                assignee_id: formData.assignee_id || currentUser.id
+                assignee_id: formData.assignee_id || currentUser.id,
+                file_url: formData.file_url || null,
+                file_name: formData.file_name || null
             };
+
+            console.log('Payload envoyé:', payload);
 
             const response = await axios.post(
                 `http://localhost:5001/planification/${project.id}/create_task`,
@@ -253,7 +301,9 @@ const TaskBoard = (projectId) => {
                 description: '',
                 due_date: '',
                 assignee_id: '',
-                percent_completion: 0
+                percent_completion: 0,
+                file_url: '',
+                file_name: ''
             });
             setShowCreateForm(false);
 
@@ -273,7 +323,9 @@ const TaskBoard = (projectId) => {
                 description: formData.description,
                 due_date: formData.due_date,
                 assignee_id: formData.assignee_id,
-                percent_completion: parseInt(formData.percent_completion)
+                percent_completion: parseInt(formData.percent_completion),
+                file_url: formData.file_url || null,
+                file_name: formData.file_name || null
             };
 
             const response = await axios.put(
@@ -340,7 +392,9 @@ const TaskBoard = (projectId) => {
             description: task.description || '',
             due_date: task.due_date.split('T')[0], // Format YYYY-MM-DD pour l'input date
             assignee_id: task.assignee_id,
-            percent_completion: task.percent_completion
+            percent_completion: task.percent_completion,
+            file_url: task.file_url || '',
+            file_name: task.file_name || ''
         });
         setShowEditForm(true);
     };
@@ -359,88 +413,6 @@ const TaskBoard = (projectId) => {
     const getMemberName = (userId) => {
         const member = projectMembers.find(m => m.user_id === userId);
         return member ? member.name : "Non assigné";
-    };
-
-    // Fonction pour ajouter un fichier
-    const handleUpload = async (file, taskId = null) => {
-        const accessToken = localStorage.getItem('accessToken');
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        if (project) {
-            formData.append('project_id', project.id);
-        }
-
-        try {
-            const response = await axios.post('http://localhost:5001/upload/file', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
-
-            const fileData = response.data.file;
-            const downloadUrl = fileData.download_url;
-            const fileName = fileData.filename;
-
-            console.log('Fichier envoyé !', fileData);
-
-            // Si nous sommes en train de créer/modifier une tâche
-            if (showCreateForm || showEditForm) {
-                // Stocker temporairement l'URL du fichier dans formData
-                setFormData({
-                    ...formData,
-                    file_url: downloadUrl,
-                    file_name: fileName
-                });
-
-                // Afficher un message de confirmation
-                alert(`Fichier "${fileName}" attaché avec succès. Il sera lié à la tâche après enregistrement.`);
-            }
-            // Si nous avons un ID de tâche spécifique, mettre à jour directement cette tâche
-            else if (taskId) {
-                // Trouver la tâche actuelle
-                const taskToUpdate = tasks.find(t => t.id === taskId);
-
-                if (taskToUpdate) {
-                    // Préparer les données de mise à jour
-                    const payload = {
-                        title: taskToUpdate.title,
-                        description: taskToUpdate.description || '',
-                        due_date: taskToUpdate.due_date,
-                        assignee_id: taskToUpdate.assignee_id,
-                        percent_completion: taskToUpdate.percent_completion,
-                        file_url: downloadUrl,
-                        file_name: fileName
-                    };
-
-                    // Appel API pour mettre à jour la tâche
-                    const response = await axios.put(
-                        `http://localhost:5001/planification/${taskId}/update`,
-                        payload,
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                            }
-                        }
-                    );
-
-                    // Mettre à jour l'état local
-                    const updatedTask = response.data.task;
-                    const updatedTasks = tasks.map(t =>
-                        t.id === updatedTask.id ? updatedTask : t
-                    );
-                    setTasks(updatedTasks);
-                    organizeTasks(updatedTasks);
-
-                    alert(`Fichier "${fileName}" attaché à la tâche.`);
-                }
-            }
-        } catch (error) {
-            console.error('Erreur lors de l\'upload', error.response?.data || error);
-            alert("Erreur lors de l'envoi du fichier.");
-        }
     };
 
     if (loading) {
@@ -559,18 +531,16 @@ const TaskBoard = (projectId) => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Joindre un fichier</label>
                                 <input
                                     type="file"
-                                    id="fileInput"
+                                    id="fileInputCreate"
                                     className="hidden"
-                                    onChange={(e) => handleUpload(e.target.files[0], projectId)}
+                                    onChange={(e) => handleUpload(e.target.files[0])}
                                 />
-
-                                <label htmlFor="fileInput">
-                                    <div className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[5px] cursor-pointer">
+                                <label htmlFor="fileInputCreate">
+                                    <div className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer">
                                         <Paperclip className="w-4 h-4 mr-2" />
-                                        Sélectionner un fichier
+                                        {formData.file_name ? `Fichier: ${formData.file_name}` : 'Sélectionner un fichier'}
                                     </div>
                                 </label>
-
                             </div>
                         </div>
                         <div className="mt-4 flex justify-end">
@@ -650,18 +620,16 @@ const TaskBoard = (projectId) => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Joindre un fichier</label>
                                 <input
                                     type="file"
-                                    id="fileInput"
+                                    id="fileInputEdit"
                                     className="hidden"
-                                    onChange={(e) => handleUpload(e.target.files[0], projectId)}
+                                    onChange={(e) => handleUpload(e.target.files[0])}
                                 />
-
-                                <label htmlFor="fileInput">
-                                    <div className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[5px] cursor-pointer">
+                                <label htmlFor="fileInputEdit">
+                                    <div className="flex items-center px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer">
                                         <Paperclip className="w-4 h-4 mr-2" />
-                                        Sélectionner un fichier
+                                        {formData.file_name ? `Fichier: ${formData.file_name}` : 'Sélectionner un fichier'}
                                     </div>
                                 </label>
-
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Progression (%)</label>
@@ -698,18 +666,17 @@ const TaskBoard = (projectId) => {
             {/* Tableau Kanban avec drag & drop natif */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {Object.entries(columns).map(([columnId, column]) => (
-                    <div 
-                        key={columnId} 
+                    <div
+                        key={columnId}
                         className="bg-white p-3 rounded-lg shadow"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, columnId)}
                     >
                         <h3 className="font-medium text-lg mb-3 flex items-center">
                             <span
-                                className={`inline-block h-3 w-3 rounded-full mr-2 ${
-                                    columnId === 'to-do' ? 'bg-red-500' :
-                                    columnId === 'in-progress' ? 'bg-yellow-500' : 'bg-green-500'
-                                }`}
+                                className={`inline-block h-3 w-3 rounded-full mr-2 ${columnId === 'to-do' ? 'bg-red-500' :
+                                        columnId === 'in-progress' ? 'bg-yellow-500' : 'bg-green-500'
+                                    }`}
                             ></span>
                             {column.name}
                             <span className="ml-2 text-gray-500 text-sm">({column.items.length})</span>
@@ -721,10 +688,9 @@ const TaskBoard = (projectId) => {
                                     draggable="true"
                                     onDragStart={(e) => handleDragStart(e, task, columnId)}
                                     onDragEnd={handleDragEnd}
-                                    className={`p-3 mb-2 rounded-md border-l-4 bg-white shadow-sm cursor-move transition-shadow hover:shadow-md ${
-                                        columnId === 'to-do' ? 'border-red-500' :
-                                        columnId === 'in-progress' ? 'border-yellow-500' : 'border-green-500'
-                                    }`}
+                                    className={`p-3 mb-2 rounded-md border-l-4 bg-white shadow-sm cursor-move transition-shadow hover:shadow-md ${columnId === 'to-do' ? 'border-red-500' :
+                                            columnId === 'in-progress' ? 'border-yellow-500' : 'border-green-500'
+                                        }`}
                                 >
                                     <div className="flex justify-between items-start">
                                         <h4 className="font-medium">{task.title}</h4>
@@ -746,6 +712,40 @@ const TaskBoard = (projectId) => {
                                     {task.description && (
                                         <p className="text-sm text-gray-600 mt-2 line-clamp-2">{task.description}</p>
                                     )}
+
+                                    {/* Affichage de la pièce jointe si elle existe */}
+                                    {task.file_url && (
+                                        <div className="mt-2">
+                                            {task.file_name && /\.(jpg|jpeg|png|gif|webp)$/i.test(task.file_name) ? (
+                                                <div className="mt-2">
+                                                    <img
+                                                        src={task.file_url}
+                                                        alt={task.file_name}
+                                                        className="max-w-full rounded-md max-h-32 object-contain mb-1"
+                                                    />
+                                                    <a
+                                                        href={task.file_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-xs text-blue-600 underline"
+                                                    >
+                                                        Voir l'image: {task.file_name}
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <a
+                                                    href={task.file_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-blue-600 underline flex items-center"
+                                                >
+                                                    <Paperclip className="w-3 h-3 mr-1" />
+                                                    {task.file_name || 'Fichier joint'}
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between mt-3 text-xs text-gray-500">
                                         <div>
                                             Assigné: {getMemberName(task.assignee_id)}
