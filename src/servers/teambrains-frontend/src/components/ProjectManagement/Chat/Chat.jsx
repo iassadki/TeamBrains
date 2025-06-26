@@ -57,24 +57,49 @@ const Chat = ({ projectId }) => {
         }
     };
 
-    // Fonction pour ajouter un fichier (placeholder pour l'instant)
-    const handleUpload = async (file, token, projectId = null) => {
+    // Fonction pour ajouter un fichier
+    const handleUpload = async (file, projectId = null) => {
+        const accessToken = localStorage.getItem('accessToken');
+
         const formData = new FormData();
         formData.append('file', file);
+
         if (projectId) {
             formData.append('project_id', projectId);
         }
 
         try {
-            const response = await axios.post('http://localhost:5000/upload/file', formData, {
+            // 1. Uploader le fichier
+            const response = await axios.post('http://localhost:5001/upload/file', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${accessToken}`
                 }
             });
-            console.log('Fichier envoyé !', response.data);
+
+            const fileData = response.data.file;
+            const downloadUrl = fileData.download_url;
+            const fileName = fileData.filename;
+
+            console.log('Fichier envoyé !', fileData);
+
+            // 2. Envoyer le message avec les informations du fichier au serveur
+            await axios.post(`http://localhost:5001/chat/${projectId}/send`, {
+                content: '', // message vide pour les fichiers
+                file_url: downloadUrl,
+                file_name: fileName
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+
+            // 3. Récupérer les messages mis à jour
+            await fetchMessages();
+
         } catch (error) {
             console.error('Erreur lors de l\'upload', error.response?.data || error);
+            setError("Erreur lors de l'envoi du fichier");
         }
     };
 
@@ -84,9 +109,9 @@ const Chat = ({ projectId }) => {
     };
 
     // Scroll automatique vers le bas lorsque de nouveaux messages sont ajoutés
-    // useEffect(() => {
-    //     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    // }, [messages]);
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     // Récupération initiale des messages + mise en place du polling
     useEffect(() => {
@@ -98,7 +123,13 @@ const Chat = ({ projectId }) => {
                 fetchMessages();
             }, 5000);
 
-            return () => clearInterval(interval);
+            // Stocker l'interval dans une référence globale pour le contrôle
+            window.chatPollingInterval = interval;
+
+            return () => {
+                clearInterval(interval);
+                window.chatPollingInterval = null;
+            };
         }
     }, [projectId]);
 
@@ -130,13 +161,58 @@ const Chat = ({ projectId }) => {
                                         }`}
                                 >
                                     <div className="font-semibold">{message.sender_name}</div>
-                                    <p className="text-sm break-words">{message.content}</p>
+
+                                    {/* Affichage du contenu texte seulement s'il existe */}
+                                    {message.content && (
+                                        <p className="text-sm break-words">{message.content}</p>
+                                    )}
+
+                                    {/* Affichage de la pièce jointe */}
+                                    {message.file_url && (
+                                        <div className="mt-2">
+                                            {message.file_name &&
+                                                /\.(jpg|jpeg|png|gif|webp)$/i.test(message.file_name) ? (
+                                                <div className="mt-2">
+                                                    <img
+                                                        src={message.file_url}
+                                                        alt={message.file_name}
+                                                        className="max-w-full rounded-md max-h-48 object-contain mb-1"
+                                                    />
+                                                    <a
+                                                        href={message.file_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className={`text-xs underline mt-1 block ${message.sender_id === currentUser.id
+                                                            ? 'text-white opacity-80'
+                                                            : 'text-blue-600'
+                                                            }`}
+                                                    >
+                                                        Télécharger l'image
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <a
+                                                    href={message.file_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className={`text-sm underline mt-1 block ${message.sender_id === currentUser.id
+                                                        ? 'text-white opacity-80'
+                                                        : 'text-blue-600'
+                                                        }`}
+                                                >
+                                                    Télécharger {message.file_name || 'le fichier'}
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="text-xs mt-1 text-right opacity-75">
                                         {formatMessageDate(message.timestamp)}
                                     </div>
                                 </div>
                             </div>
                         ))}
+
                         <div ref={messagesEndRef} />
                     </>
                 )}
@@ -170,7 +246,7 @@ const Chat = ({ projectId }) => {
                         type="file"
                         id="fileInput"
                         className="hidden"
-                        onChange={(e) => handleUpload(e.target.files[0], token, projectId)}
+                        onChange={(e) => handleUpload(e.target.files[0], projectId)}
                     />
 
                     <label htmlFor="fileInput">

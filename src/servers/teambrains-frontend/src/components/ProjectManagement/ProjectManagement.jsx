@@ -114,7 +114,7 @@ const ProjectManagement = () => {
                 </div>
             </div>
 
-                            {/* Contenu des onglets */}
+            {/* Contenu des onglets */}
             {activeTab === 'board' && (
                 <div className="bg-white rounded-lg shadow">
                     <div className="p-4">

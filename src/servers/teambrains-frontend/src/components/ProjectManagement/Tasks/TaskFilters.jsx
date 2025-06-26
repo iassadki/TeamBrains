@@ -73,6 +73,11 @@ const TaskFilters = ({
             filtered = filtered.filter(task => task.assignee_id === filters.assignee);
         }
 
+        // Filtre par sprint (ajouté pour la cohérence, même si non utilisé ici)
+        // if (filters.sprint) {
+        //     filtered = filtered.filter(task => task.sprint_id === filters.sprint);
+        // }
+
         // Filtre par statut
         if (filters.status) {
             filtered = filtered.filter(task => {
@@ -199,6 +204,19 @@ const TaskFilters = ({
                                 {member.name}
                             </option>
                         ))}
+                    </select>
+                </div>
+
+                <div className="mb-2 md:mb-0">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Sprint</label>
+                    <select
+                        value={filters.sprint}
+                        onChange={(e) => handleFilterChange('status', e.target.value)}
+                        className="w-full md:w-auto text-sm p-1.5 border border-gray-300 rounded"
+                    >
+                        {/* Iterer sur les sprints ?? */}
+                        <option value="">Tous les sprints</option>
+                        <option value="">Sprint n</option>
                     </select>
                 </div>
 
