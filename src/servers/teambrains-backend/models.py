@@ -265,6 +265,13 @@ class Subscription(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Nouveaux champs pour la gestion des échecs de paiement  
+    payment_failed_count = db.Column(db.Integer, nullable=True, default=0)
+    last_payment_failed_at = db.Column(db.DateTime, nullable=True)
+    last_payment_retry_at = db.Column(db.DateTime, nullable=True)
+    payment_method_action_required = db.Column(db.Boolean, nullable=True, default=False)
+    unpaid_invoice_id = db.Column(db.String(255), nullable=True)  # ID de la facture impayée
+    
     # Relations
     user = db.relationship('User', backref=db.backref('subscription', uselist=False))
     
@@ -279,7 +286,13 @@ class Subscription(db.Model):
             'current_period_start': self.current_period_start.isoformat(),
             'current_period_end': self.current_period_end.isoformat(),
             'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'updated_at': self.updated_at.isoformat(),
+            'payment_failed_count': self.payment_failed_count or 0,
+            'last_payment_failed_at': self.last_payment_failed_at.isoformat() if self.last_payment_failed_at else None,
+            'last_payment_retry_at': self.last_payment_retry_at.isoformat() if self.last_payment_retry_at else None,
+            'payment_method_action_required': self.payment_method_action_required or False,
+            'unpaid_invoice_id': self.unpaid_invoice_id,
+            'has_payment_issues': (self.payment_failed_count or 0) > 0 or (self.payment_method_action_required or False)
         }
 
 class Invoice(db.Model):

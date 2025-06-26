@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Check, X, Calendar, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
+import { Check, X, Calendar, CreditCard, AlertCircle, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
 
 const SubscriptionStatus = () => {
     const { currentUser } = useAuth();
@@ -8,6 +8,8 @@ const SubscriptionStatus = () => {
     const [subscription, setSubscription] = useState(null);
     const [loading, setLoading] = useState(true);
     const [cancelLoading, setCancelLoading] = useState(false);
+    const [retryLoading, setRetryLoading] = useState(false);
+    const [updatePaymentLoading, setUpdatePaymentLoading] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -98,6 +100,68 @@ const SubscriptionStatus = () => {
         });
     };
 
+    const handleRetryPayment = async () => {
+        setRetryLoading(true);
+        setError('');
+        
+        try {
+            const response = await fetch('http://localhost:5001/api/stripe/retry-payment', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('Tentative de paiement lancée. Vérifiez votre email pour les instructions.');
+                fetchSubscriptionStatus(); // Recharger les données
+            } else {
+                setError(data.error || 'Erreur lors de la relance du paiement');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            setError('Erreur de connexion au serveur');
+        } finally {
+            setRetryLoading(false);
+        }
+    };
+
+    const handleUpdatePaymentMethod = async () => {
+        setUpdatePaymentLoading(true);
+        setError('');
+        
+        try {
+            const response = await fetch('http://localhost:5001/api/stripe/update-payment-method', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    success_url: `${window.location.origin}/dashboard/subscription?updated=true`,
+                    cancel_url: `${window.location.origin}/dashboard/subscription`
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Rediriger vers Stripe pour mettre à jour le moyen de paiement
+                window.location.href = data.checkout_url;
+            } else {
+                setError(data.error || 'Erreur lors de la création de la session');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            setError('Erreur de connexion au serveur');
+        } finally {
+            setUpdatePaymentLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -150,6 +214,123 @@ const SubscriptionStatus = () => {
                     {getStatusText(subscription.status)}
                 </span>
             </div>
+
+            {/* Alertes de paiement */}
+            {subscription.has_payment_issues && (
+                <div className="mb-6">
+                    {/* Échec de paiement */}
+                    {subscription.payment_failed_count > 0 && (
+                        <div className={`p-4 rounded-lg border-l-4 mb-4 ${
+                            subscription.payment_failed_count >= 3 
+                                ? 'bg-red-50 border-red-400' 
+                                : 'bg-yellow-50 border-yellow-400'
+                        }`}>
+                            <div className="flex items-start">
+                                <AlertCircle className={`w-5 h-5 mt-0.5 mr-3 ${
+                                    subscription.payment_failed_count >= 3 
+                                        ? 'text-red-500' 
+                                        : 'text-yellow-500'
+                                }`} />
+                                <div className="flex-1">
+                                    <h3 className={`text-sm font-medium ${
+                                        subscription.payment_failed_count >= 3 
+                                            ? 'text-red-800' 
+                                            : 'text-yellow-800'
+                                    }`}>
+                                        {subscription.payment_failed_count >= 3 
+                                            ? '⚠️ Abonnement suspendu - Action requise'
+                                            : '⚠️ Échec de paiement détecté'
+                                        }
+                                    </h3>
+                                    <p className={`text-sm mt-1 ${
+                                        subscription.payment_failed_count >= 3 
+                                            ? 'text-red-700' 
+                                            : 'text-yellow-700'
+                                    }`}>
+                                        {subscription.payment_failed_count >= 3 
+                                            ? `Votre abonnement a été suspendu après ${subscription.payment_failed_count} tentatives de paiement échouées. Veuillez mettre à jour votre moyen de paiement ou relancer le paiement pour rétablir l'accès.`
+                                            : `${subscription.payment_failed_count} tentative(s) de paiement échouée(s). ${subscription.last_payment_failed_at ? `Dernière tentative: ${formatDate(subscription.last_payment_failed_at)}` : ''}`
+                                        }
+                                    </p>
+                                    <div className="mt-3 flex space-x-3">
+                                        <button
+                                            onClick={handleRetryPayment}
+                                            disabled={retryLoading}
+                                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
+                                        >
+                                            {retryLoading ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Relance...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                                    Relancer le paiement
+                                                </>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={handleUpdatePaymentMethod}
+                                            disabled={updatePaymentLoading}
+                                            className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                        >
+                                            {updatePaymentLoading ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Redirection...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ExternalLink className="w-4 h-4 mr-2" />
+                                                    Mettre à jour la carte
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Action requise (3D Secure, etc.) */}
+                    {subscription.payment_method_action_required && (
+                        <div className="p-4 rounded-lg border-l-4 bg-blue-50 border-blue-400">
+                            <div className="flex items-start">
+                                <AlertCircle className="w-5 h-5 mt-0.5 mr-3 text-blue-500" />
+                                <div className="flex-1">
+                                    <h3 className="text-sm font-medium text-blue-800">
+                                        🔐 Action requise pour votre paiement
+                                    </h3>
+                                    <p className="text-sm mt-1 text-blue-700">
+                                        Votre banque demande une authentification supplémentaire (3D Secure) pour valider le paiement. 
+                                        Cliquez sur "Relancer le paiement" pour compléter l'authentification.
+                                    </p>
+                                    <div className="mt-3">
+                                        <button
+                                            onClick={handleRetryPayment}
+                                            disabled={retryLoading}
+                                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
+                                        >
+                                            {retryLoading ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Authentification...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ExternalLink className="w-4 h-4 mr-2" />
+                                                    Compléter l'authentification
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Informations du plan */}

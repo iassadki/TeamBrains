@@ -130,9 +130,9 @@ const NavBar = ({
                                     {currentUser.role === "admin" && (
                                         <>
                                             <div className="border-t border-gray-100 my-1"></div>
-                                            <NavLink to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                Admin
-                                            </NavLink>
+                                        <NavLink to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                            Admin
+                                        </NavLink>
                                         </>
                                     )}
                                     <div className="border-t border-gray-100 my-1"></div>
