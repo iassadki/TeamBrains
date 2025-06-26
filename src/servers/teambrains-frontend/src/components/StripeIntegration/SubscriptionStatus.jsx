@@ -10,6 +10,7 @@ const SubscriptionStatus = () => {
     const [cancelLoading, setCancelLoading] = useState(false);
     const [retryLoading, setRetryLoading] = useState(false);
     const [updatePaymentLoading, setUpdatePaymentLoading] = useState(false);
+    const [syncLoading, setSyncLoading] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -159,6 +160,34 @@ const SubscriptionStatus = () => {
             setError('Erreur de connexion au serveur');
         } finally {
             setUpdatePaymentLoading(false);
+        }
+    };
+
+    const handleSyncStudentCount = async () => {
+        setSyncLoading(true);
+        try {
+            const response = await fetch('http://localhost:5001/api/stripe/school/sync-student-count', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Recharger les données de l'abonnement
+                await fetchSubscriptionStatus();
+                alert(`Synchronisation réussie ! ${data.new_student_count} étudiants trouvés. Nouveau montant: ${data.total_yearly_euros}€/an`);
+            } else {
+                setError(data.error || 'Erreur lors de la synchronisation');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            setError('Erreur de connexion au serveur');
+        } finally {
+            setSyncLoading(false);
         }
     };
 
@@ -347,15 +376,46 @@ const SubscriptionStatus = () => {
                                     <Check className="w-5 h-5 text-green-600 mr-2" />
                                 )}
                                 <span className="font-medium">
-                                    Plan {subscription.plan_type === 'student' ? 'Étudiant' : 'École'}
+                                    Plan {subscription.plan_type === 'student' ? 'Étudiant' : 'École (Hybride)'}
                                 </span>
                             </div>
-                            <p className="text-gray-600 text-sm">
-                                {subscription.plan_type === 'student' 
-                                    ? '2€/mois - Parfait pour les étudiants individuels'
-                                    : '120€/an - Solution complète pour les établissements'
-                                }
-                            </p>
+                            {subscription.plan_type === 'student' ? (
+                                <p className="text-gray-600 text-sm">
+                                    2€/mois - Parfait pour les étudiants individuels
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="text-sm">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-600">Plan de base:</span>
+                                            <span className="font-medium">{subscription.base_plan_amount_euros || 120}€/an</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-600">Étudiants inscrits:</span>
+                                            <span className="font-medium">{subscription.current_student_count || 0}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-600">Prix par étudiant:</span>
+                                            <span className="font-medium">{subscription.student_price_per_month_euros || 2}€/mois</span>
+                                        </div>
+                                        <hr className="my-2" />
+                                        <div className="flex justify-between items-center font-semibold">
+                                            <span className="text-gray-800">Total annuel:</span>
+                                            <span className="text-green-600">
+                                                {subscription.total_yearly_amount_euros ? 
+                                                    `${subscription.total_yearly_amount_euros}€/an` : 
+                                                    'Calcul en cours...'
+                                                }
+                                            </span>
+                                        </div>
+                                        {subscription.last_student_count_update && (
+                                            <div className="text-xs text-gray-500 mt-2">
+                                                Dernière mise à jour: {formatDate(subscription.last_student_count_update)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -390,6 +450,32 @@ const SubscriptionStatus = () => {
                             Actions
                         </h3>
                         <div className="space-y-3">
+                            {/* Actions spécifiques aux écoles */}
+                            {subscription.plan_type === 'school' && (
+                                <div className="bg-green-50 rounded-lg p-3 mb-3">
+                                    <h4 className="text-sm font-medium text-green-800 mb-2">
+                                        🏫 Gestion École
+                                    </h4>
+                                    <button
+                                        onClick={handleSyncStudentCount}
+                                        disabled={syncLoading}
+                                        className="w-full px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-300 disabled:cursor-not-allowed text-sm"
+                                    >
+                                        {syncLoading ? (
+                                            <div className="flex items-center justify-center">
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Synchronisation...
+                                            </div>
+                                        ) : (
+                                            '🔄 Synchroniser le nombre d\'étudiants'
+                                        )}
+                                    </button>
+                                    <div className="text-xs text-green-700 mt-1">
+                                        Met à jour automatiquement le compteur et recalcule la facturation
+                                    </div>
+                                </div>
+                            )}
+                            
                             <a
                                 href="/dashboard/invoices"
                                 className="block w-full px-4 py-2 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 transition-colors"

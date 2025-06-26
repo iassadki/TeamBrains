@@ -272,11 +272,28 @@ class Subscription(db.Model):
     payment_method_action_required = db.Column(db.Boolean, nullable=True, default=False)
     unpaid_invoice_id = db.Column(db.String(255), nullable=True)  # ID de la facture impayée
     
+    # Nouveaux champs pour la facturation hybride écoles
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=True)  # École associée
+    base_plan_amount = db.Column(db.Integer, nullable=True, default=12000)  # Montant de base en centimes (120€)
+    student_price_per_month = db.Column(db.Integer, nullable=True, default=200)  # Prix par étudiant/mois (2€)
+    current_student_count = db.Column(db.Integer, nullable=True, default=0)  # Nombre d'étudiants actuel
+    last_student_count_update = db.Column(db.DateTime, nullable=True)  # Dernière mise à jour du compteur
+    total_monthly_amount = db.Column(db.Integer, nullable=True)  # Montant total calculé en centimes
+    
     # Relations
     user = db.relationship('User', backref=db.backref('subscription', uselist=False))
+    school = db.relationship('School', backref=db.backref('subscription', uselist=False))
     
     def to_dict(self):
-        return {
+        # Calculer le montant total pour les écoles
+        calculated_total = None
+        if self.plan_type == 'school' and self.school_id:
+            base_amount = self.base_plan_amount or 12000  # 120€ par défaut
+            student_price = self.student_price_per_month or 200  # 2€ par défaut
+            student_count = self.current_student_count or 0
+            calculated_total = base_amount + (student_price * student_count)
+        
+        result = {
             'id': self.id,
             'user_id': self.user_id,
             'stripe_subscription_id': self.stripe_subscription_id,
@@ -294,6 +311,24 @@ class Subscription(db.Model):
             'unpaid_invoice_id': self.unpaid_invoice_id,
             'has_payment_issues': (self.payment_failed_count or 0) > 0 or (self.payment_method_action_required or False)
         }
+        
+        # Ajouter les champs spécifiques aux écoles
+        if self.plan_type == 'school':
+            result.update({
+                'school_id': self.school_id,
+                'base_plan_amount': self.base_plan_amount or 12000,
+                'base_plan_amount_euros': (self.base_plan_amount or 12000) / 100,
+                'student_price_per_month': self.student_price_per_month or 200,
+                'student_price_per_month_euros': (self.student_price_per_month or 200) / 100,
+                'current_student_count': self.current_student_count or 0,
+                'last_student_count_update': self.last_student_count_update.isoformat() if self.last_student_count_update else None,
+                'total_monthly_amount': calculated_total,
+                'total_monthly_amount_euros': calculated_total / 100 if calculated_total else None,
+                'total_yearly_amount': calculated_total * 12 if calculated_total else None,
+                'total_yearly_amount_euros': (calculated_total * 12) / 100 if calculated_total else None
+            })
+        
+        return result
 
 class Invoice(db.Model):
     __tablename__ = 'invoices'

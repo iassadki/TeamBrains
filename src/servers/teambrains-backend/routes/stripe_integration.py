@@ -32,9 +32,22 @@ def create_checkout_session():
         
         data = request.get_json()
         plan_type = data.get('plan_type')  # 'student' ou 'school'
+        school_id = data.get('school_id')  # Pour les abonnements école (optionnel)
+        student_count = data.get('student_count', 0)  # Nombre d'étudiants pour le plan école
         
         if plan_type not in ['student', 'school']:
             return jsonify({'error': 'Type de plan invalide'}), 400
+        
+        # Pour les plans école, valider le nombre d'étudiants
+        if plan_type == 'school' and student_count < 1:
+            return jsonify({'error': 'Le nombre d\'étudiants doit être d\'au moins 1'}), 400
+        
+        # Pour les plans école, vérifier que l'école existe si elle est spécifiée
+        if plan_type == 'school' and school_id:
+            from models import School
+            school = School.query.get(school_id)
+            if not school:
+                return jsonify({'error': 'École non trouvée'}), 404
         
         # Créer ou récupérer le customer Stripe
         stripe_customer = None
@@ -52,27 +65,34 @@ def create_checkout_session():
                 }
             )
         
-        # Déterminer l'URL de prix selon le plan
-        if plan_type == 'student':
-            price_lookup_key = 'student_monthly'
-            mode = 'subscription'
-        else:  # school
-            price_lookup_key = 'school_yearly'
-            mode = 'subscription'
+        # Calculer le prix selon le type de plan
+        if plan_type == 'school':
+            # Plan école hybride : base + étudiants
+            base_amount = 12000  # 120€ de base par an
+            student_amount = 200 * student_count * 12  # 2€ par étudiant par mois, pour 1 an
+            total_yearly_amount = base_amount + student_amount
+            
+            product_description = f'Plan École Hybride : 120€/an + {student_count} étudiants × 24€/an = {total_yearly_amount/100}€/an'
+            logging.info(f"Prix calculé pour école: base={base_amount}, étudiants={student_count}, montant_étudiants={student_amount}, total={total_yearly_amount}")
+        else:
+            # Plan étudiant classique
+            total_yearly_amount = 200  # 2€/mois pour étudiant
+            student_count = 0
+            product_description = f'Abonnement TeamBrains Étudiant - 2€/mois'
         
         # Créer la session Checkout
         checkout_session = stripe.checkout.Session.create(
             customer=stripe_customer.id,
             payment_method_types=['card'],
-            mode=mode,
+            mode='subscription',
             line_items=[{
                 'price_data': {
                     'currency': 'eur',
                     'product_data': {
-                        'name': f'TeamBrains - Plan {plan_type.title()}',
-                        'description': f'Abonnement TeamBrains {plan_type}'
+                        'name': f'TeamBrains - Plan {plan_type.title()}{"" if plan_type == "student" else " (Hybride)"}',
+                        'description': product_description
                     },
-                    'unit_amount': 200 if plan_type == 'student' else 12000,  # 2€ ou 120€ en centimes
+                    'unit_amount': total_yearly_amount,
                     'recurring': {
                         'interval': 'month' if plan_type == 'student' else 'year'
                     }
@@ -83,7 +103,9 @@ def create_checkout_session():
             cancel_url="http://localhost:5173/tarifs?canceled=true",
             metadata={
                 'user_id': user.id,
-                'plan_type': plan_type
+                'plan_type': plan_type,
+                'school_id': str(school_id) if school_id else '',
+                'student_count': str(student_count) if plan_type == 'school' else '0'
             }
         )
         
@@ -154,6 +176,8 @@ def handle_checkout_session_completed(session):
         
         user_id = session['metadata']['user_id']
         plan_type = session['metadata']['plan_type']
+        school_id = session['metadata'].get('school_id')
+        student_count = session['metadata'].get('student_count')
         
         # Vérifier si la session a une subscription
         if not session.get('subscription'):
@@ -175,6 +199,23 @@ def handle_checkout_session_completed(session):
         subscription.status = stripe_subscription.status
         subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
         subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+        
+        # Pour les abonnements école, ajouter les informations hybrides
+        if plan_type == 'school':
+            if school_id and school_id.isdigit():
+                subscription.school_id = int(school_id)
+            if student_count and student_count.isdigit():
+                subscription.current_student_count = int(student_count)
+                subscription.last_student_count_update = datetime.utcnow()
+            
+            # Initialiser les montants par défaut
+            subscription.base_plan_amount = 12000  # 120€
+            subscription.student_price_per_month = 200  # 2€
+            
+            # Calculer le montant total mensuel
+            base_monthly = subscription.base_plan_amount // 12  # 10€ par mois
+            student_monthly = (subscription.current_student_count or 0) * subscription.student_price_per_month
+            subscription.total_monthly_amount = base_monthly + student_monthly
         
         db.session.add(subscription)
         db.session.commit()
@@ -647,3 +688,285 @@ def enable_webhook(webhook_id):
     except Exception as e:
         logging.error(f"Erreur activation webhook: {str(e)}")
         return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500 
+
+# ===============================
+# NOUVELLES ROUTES FACTURATION HYBRIDE ÉCOLES
+# ===============================
+
+@stripe_bp.route('/school/update-student-count', methods=['POST'])
+@jwt_required()
+def update_school_student_count():
+    """Mettre à jour le nombre d'étudiants et recalculer la facturation"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Utilisateur non trouvé'}), 404
+        
+        # Récupérer l'abonnement école de l'utilisateur
+        subscription = Subscription.query.filter_by(user_id=user_id, plan_type='school').first()
+        if not subscription:
+            return jsonify({'error': 'Aucun abonnement école trouvé'}), 404
+        
+        data = request.get_json()
+        new_student_count = data.get('student_count')
+        
+        if new_student_count is None or new_student_count < 0:
+            return jsonify({'error': 'Nombre d\'étudiants invalide'}), 400
+        
+        # Mettre à jour le compteur d'étudiants
+        old_count = subscription.current_student_count or 0
+        subscription.current_student_count = new_student_count
+        subscription.last_student_count_update = datetime.utcnow()
+        
+        # Calculer le nouveau montant
+        base_amount = subscription.base_plan_amount or 12000  # 120€
+        student_price = subscription.student_price_per_month or 200  # 2€
+        new_total = base_amount + (student_price * new_student_count)
+        subscription.total_monthly_amount = new_total
+        
+        db.session.commit()
+        
+        # Si c'est un abonnement Stripe actif, mettre à jour le montant
+        if subscription.stripe_subscription_id and subscription.status == 'active':
+            try:
+                # Récupérer l'abonnement Stripe
+                stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+                
+                # Mettre à jour l'abonnement avec le nouveau montant annuel
+                yearly_amount = new_total * 12
+                stripe.Subscription.modify(
+                    subscription.stripe_subscription_id,
+                    items=[{
+                        'id': stripe_subscription['items']['data'][0]['id'],
+                        'price_data': {
+                            'currency': 'eur',
+                            'product_data': {
+                                'name': 'TeamBrains - Plan École (Hybride)',
+                                'description': f'Plan de base (120€/an) + {new_student_count} étudiants (2€/mois chacun)'
+                            },
+                            'unit_amount': yearly_amount,
+                            'recurring': {'interval': 'year'}
+                        }
+                    }]
+                )
+                
+                logging.info(f"Abonnement Stripe mis à jour: {new_student_count} étudiants, {yearly_amount/100}€/an")
+                
+            except stripe.error.StripeError as e:
+                logging.error(f"Erreur mise à jour Stripe: {str(e)}")
+                # On continue même si Stripe échoue, les données locales sont mises à jour
+        
+        return jsonify({
+            'message': 'Nombre d\'étudiants mis à jour avec succès',
+            'old_student_count': old_count,
+            'new_student_count': new_student_count,
+            'base_amount_euros': base_amount / 100,
+            'student_price_euros': student_price / 100,
+            'total_monthly_euros': new_total / 100,
+            'total_yearly_euros': (new_total * 12) / 100,
+            'subscription': subscription.to_dict()
+        })
+        
+    except Exception as e:
+        logging.error(f"Erreur mise à jour nombre étudiants: {str(e)}")
+        return jsonify({'error': 'Erreur lors de la mise à jour'}), 500
+
+@stripe_bp.route('/school/sync-student-count', methods=['POST'])
+@jwt_required()
+def sync_school_student_count():
+    """Synchroniser automatiquement le nombre d'étudiants depuis la base de données"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Utilisateur non trouvé'}), 404
+        
+        # Récupérer l'abonnement école de l'utilisateur
+        subscription = Subscription.query.filter_by(user_id=user_id, plan_type='school').first()
+        if not subscription or not subscription.school_id:
+            return jsonify({'error': 'Aucun abonnement école avec école associée trouvé'}), 404
+        
+        # Compter les étudiants actifs de l'école
+        from models import User as UserModel, School
+        school = School.query.get(subscription.school_id)
+        if not school:
+            return jsonify({'error': 'École non trouvée'}), 404
+        
+        # Compter les étudiants actifs
+        student_count = UserModel.query.filter_by(
+            school_id=subscription.school_id,
+            role='student'
+        ).count()
+        
+        # Mettre à jour l'abonnement
+        old_count = subscription.current_student_count or 0
+        subscription.current_student_count = student_count
+        subscription.last_student_count_update = datetime.utcnow()
+        
+        # Calculer le nouveau montant
+        base_amount = subscription.base_plan_amount or 12000  # 120€
+        student_price = subscription.student_price_per_month or 200  # 2€
+        new_total = base_amount + (student_price * student_count)
+        subscription.total_monthly_amount = new_total
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'Synchronisation terminée pour l\'école {school.name}',
+            'school_name': school.name,
+            'old_student_count': old_count,
+            'new_student_count': student_count,
+            'base_amount_euros': base_amount / 100,
+            'student_price_euros': student_price / 100,
+            'total_monthly_euros': new_total / 100,
+            'total_yearly_euros': (new_total * 12) / 100,
+            'last_sync': subscription.last_student_count_update.isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Erreur synchronisation nombre étudiants: {str(e)}")
+        return jsonify({'error': 'Erreur lors de la synchronisation'}), 500
+
+@stripe_bp.route('/school/pricing-config', methods=['GET', 'POST'])
+@jwt_required()
+def manage_school_pricing():
+    """Gérer la configuration des prix pour l'école"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Utilisateur non trouvé'}), 404
+        
+        # Récupérer l'abonnement école de l'utilisateur
+        subscription = Subscription.query.filter_by(user_id=user_id, plan_type='school').first()
+        if not subscription:
+            return jsonify({'error': 'Aucun abonnement école trouvé'}), 404
+        
+        if request.method == 'GET':
+            # Retourner la configuration actuelle
+            return jsonify({
+                'base_plan_amount': subscription.base_plan_amount or 12000,
+                'base_plan_amount_euros': (subscription.base_plan_amount or 12000) / 100,
+                'student_price_per_month': subscription.student_price_per_month or 200,
+                'student_price_per_month_euros': (subscription.student_price_per_month or 200) / 100,
+                'current_student_count': subscription.current_student_count or 0,
+                'total_monthly_amount': subscription.total_monthly_amount,
+                'total_monthly_amount_euros': subscription.total_monthly_amount / 100 if subscription.total_monthly_amount else None,
+                'last_update': subscription.last_student_count_update.isoformat() if subscription.last_student_count_update else None
+            })
+        
+        elif request.method == 'POST':
+            # Mettre à jour la configuration (admin seulement)
+            if user.role != 'admin':
+                return jsonify({'error': 'Accès non autorisé - Admin requis'}), 403
+            
+            data = request.get_json()
+            
+            # Valider les données
+            base_amount = data.get('base_plan_amount')
+            student_price = data.get('student_price_per_month')
+            
+            if base_amount is not None:
+                if base_amount < 0:
+                    return jsonify({'error': 'Montant de base invalide'}), 400
+                subscription.base_plan_amount = int(base_amount * 100) if isinstance(base_amount, float) else base_amount
+            
+            if student_price is not None:
+                if student_price < 0:
+                    return jsonify({'error': 'Prix étudiant invalide'}), 400
+                subscription.student_price_per_month = int(student_price * 100) if isinstance(student_price, float) else student_price
+            
+            # Recalculer le montant total
+            base_amount_cents = subscription.base_plan_amount or 12000
+            student_price_cents = subscription.student_price_per_month or 200
+            student_count = subscription.current_student_count or 0
+            new_total = base_amount_cents + (student_price_cents * student_count)
+            subscription.total_monthly_amount = new_total
+            
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Configuration mise à jour avec succès',
+                'base_plan_amount_euros': base_amount_cents / 100,
+                'student_price_per_month_euros': student_price_cents / 100,
+                'current_student_count': student_count,
+                'total_monthly_amount_euros': new_total / 100,
+                'total_yearly_amount_euros': (new_total * 12) / 100
+            })
+        
+    except Exception as e:
+        logging.error(f"Erreur gestion configuration prix école: {str(e)}")
+        return jsonify({'error': 'Erreur lors de la gestion de la configuration'}), 500
+
+@stripe_bp.route('/school/associate-subscription', methods=['POST'])
+@jwt_required()
+def associate_school_subscription():
+    """Associer une école à un abonnement existant"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Utilisateur non trouvé'}), 404
+        
+        data = request.get_json()
+        school_id = data.get('school_id')
+        
+        if not school_id:
+            return jsonify({'error': 'ID école requis'}), 400
+        
+        # Vérifier que l'école existe
+        from models import School
+        school = School.query.get(school_id)
+        if not school:
+            return jsonify({'error': 'École non trouvée'}), 404
+        
+        # Récupérer l'abonnement école de l'utilisateur
+        subscription = Subscription.query.filter_by(user_id=user_id, plan_type='school').first()
+        if not subscription:
+            return jsonify({'error': 'Aucun abonnement école trouvé'}), 404
+        
+        # Vérifier qu'aucune autre école n'est déjà associée à cet abonnement
+        if subscription.school_id and subscription.school_id != school_id:
+            existing_school = School.query.get(subscription.school_id)
+            return jsonify({
+                'error': f'Cet abonnement est déjà associé à l\'école {existing_school.name if existing_school else "inconnue"}'
+            }), 400
+        
+        # Associer l'école à l'abonnement
+        subscription.school_id = school_id
+        
+        # Compter automatiquement les étudiants
+        student_count = User.query.filter_by(
+            school_id=school_id,
+            role='student'
+        ).count()
+        
+        subscription.current_student_count = student_count
+        subscription.last_student_count_update = datetime.utcnow()
+        
+        # Calculer le montant total
+        base_amount = subscription.base_plan_amount or 12000
+        student_price = subscription.student_price_per_month or 200
+        total_amount = base_amount + (student_price * student_count)
+        subscription.total_monthly_amount = total_amount
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'École {school.name} associée avec succès à l\'abonnement',
+            'school': {
+                'id': school.id,
+                'name': school.name,
+                'student_count': student_count
+            },
+            'subscription': subscription.to_dict()
+        })
+        
+    except Exception as e:
+        logging.error(f"Erreur association école-abonnement: {str(e)}")
+        return jsonify({'error': 'Erreur lors de l\'association'}), 500
