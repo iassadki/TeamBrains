@@ -109,6 +109,8 @@ class Task(db.Model):
             'project_id': self.project_id,
             'priority': self.priority,
             'sprint': self.sprint,
+            'file_url': self.file_url,
+            'file_name': self.file_name,
             'assigned_students': [ts.to_dict() for ts in self.task_students] if hasattr(self, 'task_students') else [],
             'subtasks_count': len(self.subtasks) if hasattr(self, 'subtasks') else 0
         }
