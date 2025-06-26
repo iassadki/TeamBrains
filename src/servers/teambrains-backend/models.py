@@ -250,3 +250,73 @@ class SchoolToken(db.Model):
             'is_active': self.is_active,
             'created_by': self.created_by
         }
+
+class Subscription(db.Model):
+    __tablename__ = 'subscriptions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(100), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    stripe_subscription_id = db.Column(db.String(255), nullable=False, unique=True)
+    stripe_customer_id = db.Column(db.String(255), nullable=False)
+    plan_type = db.Column(db.String(50), nullable=False)  # 'student' ou 'school'
+    status = db.Column(db.String(50), nullable=False)  # 'active', 'canceled', 'past_due', etc.
+    current_period_start = db.Column(db.DateTime, nullable=False)
+    current_period_end = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relations
+    user = db.relationship('User', backref=db.backref('subscription', uselist=False))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'stripe_subscription_id': self.stripe_subscription_id,
+            'stripe_customer_id': self.stripe_customer_id,
+            'plan_type': self.plan_type,
+            'status': self.status,
+            'current_period_start': self.current_period_start.isoformat(),
+            'current_period_end': self.current_period_end.isoformat(),
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
+
+class Invoice(db.Model):
+    __tablename__ = 'invoices'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(100), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    subscription_id = db.Column(db.Integer, db.ForeignKey('subscriptions.id', ondelete='CASCADE'), nullable=True)
+    stripe_invoice_id = db.Column(db.String(255), nullable=False, unique=True)
+    amount_paid = db.Column(db.Integer, nullable=False)  # en centimes
+    currency = db.Column(db.String(3), nullable=False, default='eur')
+    status = db.Column(db.String(50), nullable=False)  # 'paid', 'open', 'void', etc.
+    invoice_pdf = db.Column(db.String(500), nullable=True)  # URL du PDF
+    hosted_invoice_url = db.Column(db.String(500), nullable=True)  # URL Stripe
+    invoice_date = db.Column(db.DateTime, nullable=False)
+    due_date = db.Column(db.DateTime, nullable=True)
+    paid_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relations
+    user = db.relationship('User', backref=db.backref('invoices', lazy=True))
+    subscription = db.relationship('Subscription', backref=db.backref('invoices', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'subscription_id': self.subscription_id,
+            'stripe_invoice_id': self.stripe_invoice_id,
+            'amount_paid': self.amount_paid,
+            'amount_paid_euros': self.amount_paid / 100,  # conversion en euros
+            'currency': self.currency,
+            'status': self.status,
+            'invoice_pdf': self.invoice_pdf,
+            'hosted_invoice_url': self.hosted_invoice_url,
+            'invoice_date': self.invoice_date.isoformat(),
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'paid_at': self.paid_at.isoformat() if self.paid_at else None,
+            'created_at': self.created_at.isoformat()
+        }

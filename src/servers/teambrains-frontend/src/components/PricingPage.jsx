@@ -1,7 +1,13 @@
-import React from 'react';
-import { Check, Users, GraduationCap, Star, Shield, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, Users, GraduationCap, Star, Shield, Zap, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const PricingPage = () => {
+    const { currentUser } = useAuth();
+    const token = currentUser?.accessToken;
+    const [loading, setLoading] = useState(null);
+    const [error, setError] = useState('');
+    
     const plans = [
         {
             id: 'student',
@@ -50,8 +56,41 @@ const PricingPage = () => {
         }
     ];
 
-    const handlePlanSelect = (stripeUrl) => {
-        window.open(stripeUrl, '_blank');
+    const handlePlanSelect = async (planId) => {
+        if (!token) {
+            setError('Vous devez être connecté pour souscrire à un plan');
+            return;
+        }
+
+        setLoading(planId);
+        setError('');
+
+        try {
+            const response = await fetch('http://localhost:5001/api/stripe/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    plan_type: planId
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Rediriger vers Stripe Checkout
+                window.location.href = data.checkout_url;
+            } else {
+                setError(data.error || 'Erreur lors de la création de la session de paiement');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            setError('Erreur de connexion au serveur');
+        } finally {
+            setLoading(null);
+        }
     };
 
     return (
@@ -66,6 +105,16 @@ const PricingPage = () => {
                         Découvrez la solution de gestion de projets étudiants qui transforme 
                         votre façon de collaborer et d'apprendre
                     </p>
+                    {error && (
+                        <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg max-w-md mx-auto">
+                            {error}
+                        </div>
+                    )}
+                    {!token && (
+                        <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg max-w-md mx-auto">
+                            Veuillez vous connecter pour souscrire à un plan
+                        </div>
+                    )}
                 </div>
 
                 {/* Cartes de tarification */}
@@ -117,14 +166,22 @@ const PricingPage = () => {
 
                                     {/* Bouton d'action */}
                                     <button
-                                        onClick={() => handlePlanSelect(plan.stripeUrl)}
+                                        onClick={() => handlePlanSelect(plan.id)}
+                                        disabled={loading === plan.id || !token}
                                         className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 ${
                                             plan.color === 'green'
-                                                ? 'bg-green-600 hover:bg-green-700 text-white'
-                                                : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                        } hover:shadow-lg hover:scale-105`}
+                                                ? 'bg-green-600 hover:bg-green-700 text-white disabled:bg-green-300'
+                                                : 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-300'
+                                        } hover:shadow-lg hover:scale-105 disabled:cursor-not-allowed disabled:transform-none`}
                                     >
-                                        Choisir ce plan
+                                        {loading === plan.id ? (
+                                            <div className="flex items-center justify-center">
+                                                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                                Redirection...
+                                            </div>
+                                        ) : (
+                                            'Choisir ce plan'
+                                        )}
                                     </button>
                                 </div>
 
