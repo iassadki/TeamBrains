@@ -141,8 +141,20 @@ def stripe_webhook():
 def handle_checkout_session_completed(session):
     """Traiter la completion d'une session de checkout"""
     try:
+        logging.info(f"Session reçue: {session}")
+        
+        # Vérifier si les métadonnées existent (vraie session vs test)
+        if not session.get('metadata') or not session['metadata'].get('user_id'):
+            logging.warning("Session sans métadonnées user_id - probablement un test Stripe CLI")
+            return
+        
         user_id = session['metadata']['user_id']
         plan_type = session['metadata']['plan_type']
+        
+        # Vérifier si la session a une subscription
+        if not session.get('subscription'):
+            logging.warning("Session sans subscription ID")
+            return
         
         # Récupérer la subscription Stripe
         stripe_subscription = stripe.Subscription.retrieve(session['subscription'])
@@ -167,6 +179,7 @@ def handle_checkout_session_completed(session):
         
     except Exception as e:
         logging.error(f"Erreur traitement checkout session: {str(e)}")
+        logging.error(f"Session data: {session}")
 
 def handle_invoice_payment_succeeded(invoice):
     """Traiter le paiement réussi d'une facture"""
