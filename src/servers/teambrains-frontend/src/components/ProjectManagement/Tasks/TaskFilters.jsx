@@ -17,6 +17,7 @@ const TaskFilters = ({
     const [allTasks, setAllTasks] = useState([]);
     const [filteredTasks, setFilteredTasks] = useState([]);
     const [availableSprints, setAvailableSprints] = useState([]);
+    const [taskValidations, setTaskValidations] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -63,6 +64,25 @@ const TaskFilters = ({
                         }
                     });
                     setAvailableSprints(sprintsResponse.data.sprints);
+
+                    // Récupération des validations des tâches
+                    const validationPromises = tasksResponse.data.tasks.map(task =>
+                        axios.get(`http://localhost:5001/validation/task/${task.id}/status`, {
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                            }
+                        }).catch(() => null) // Ignore les erreurs pour les tâches sans validation
+                    );
+
+                    const validationResponses = await Promise.all(validationPromises);
+                    const validationsMap = {};
+                    validationResponses.forEach((response, index) => {
+                        if (response && response.data) {
+                            const taskId = tasksResponse.data.tasks[index].id;
+                            validationsMap[taskId] = response.data;
+                        }
+                    });
+                    setTaskValidations(validationsMap);
 
                     setLoading(false);
                 } catch (error) {
@@ -201,6 +221,30 @@ const TaskFilters = ({
             return 'Sprint actuel';
         }
         return sprintValue;
+    };
+
+    // Obtenir le statut de validation d'une tâche
+    const getValidationStatus = (taskId) => {
+        return taskValidations[taskId]?.current_status || 'not_started';
+    };
+
+    // Obtenir l'indicateur visuel de validation
+    const getValidationIndicator = (task) => {
+        const status = getValidationStatus(task.id);
+
+        if (task.percent_completion === 100) {
+            switch (status) {
+                case 'validated':
+                    return <div className="w-3 h-3 bg-green-500 rounded ml-2" title="Tâche validée"></div>;
+                case 'rejected':
+                    return <div className="w-3 h-3 bg-red-500 rounded ml-2" title="Modifications demandées"></div>;
+                case 'completed_pending_validation':
+                    return <div className="w-3 h-3 bg-orange-500 rounded ml-2" title="En attente de validation"></div>;
+                default:
+                    return <div className="w-3 h-3 bg-gray-300 rounded ml-2" title="Pas de validation"></div>;
+            }
+        }
+        return null;
     };
 
     if (loading) {
@@ -401,6 +445,30 @@ const TaskFilters = ({
                                                         <Paperclip className="w-3 h-3 mr-1" />
                                                         {task.file_name || 'Fichier joint'}
                                                     </a>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Affichage du statut de validation */}
+                                        {task.percent_completion === 100 && (
+                                            <div className="mb-2">
+                                                {getValidationStatus(task.id) === 'validated' && (
+                                                    <div className="text-xs text-green-600 flex items-center">
+                                                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                                                        Tâche validée
+                                                    </div>
+                                                )}
+                                                {getValidationStatus(task.id) === 'rejected' && (
+                                                    <div className="text-xs text-red-600 flex items-center">
+                                                        <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                                                        Modifications demandées
+                                                    </div>
+                                                )}
+                                                {getValidationStatus(task.id) === 'completed_pending_validation' && (
+                                                    <div className="text-xs text-orange-600 flex items-center">
+                                                        <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
+                                                        En attente de validation
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
