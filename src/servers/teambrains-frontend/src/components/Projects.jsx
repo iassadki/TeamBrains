@@ -20,6 +20,9 @@ const Projects = () => {
     const [sortOrder, setSortOrder] = useState('newest');
     const navigate = useNavigate();
     const [showFilters, setShowFilters] = useState(false);
+    const [showMyProjectsOnly, setShowMyProjectsOnly] = useState(false);
+    const [showAvailableProjectsOnly, setShowAvailableProjectsOnly] = useState(false);
+    
     const [selectedProfiles, setSelectedProfiles] = useState({
         FullStack: false,
         BackEnd: false,
@@ -106,6 +109,52 @@ const Projects = () => {
     };
 
     const filteredProjects = sortedProjects.filter(project => {
+        // Filtre "Mes projets" - vérifie si l'utilisateur est membre du projet ou créateur
+        if (showMyProjectsOnly) {
+            const isCreator = currentUser && project.creator_id === currentUser.id;
+            const isMember = project.members && project.members.some(member => 
+                currentUser && member.user_id === currentUser.id
+            );
+            if (!isCreator && !isMember) return false;
+        }
+
+        // Filtre "Projets disponibles" - vérifie si l'utilisateur peut s'inscrire
+        if (showAvailableProjectsOnly) {
+            if (!currentUser) return false;
+            
+            // Vérifier si l'utilisateur est déjà créateur ou membre
+            const isCreator = project.creator_id === currentUser.id;
+            const isMember = project.members && project.members.some(member => 
+                member.user_id === currentUser.id
+            );
+            
+            // Si déjà inscrit, ne pas afficher
+            if (isCreator || isMember) return false;
+            
+            // Pour les entrepreneurs, ils peuvent rejoindre n'importe quel projet
+            if (currentUser.role === 'businessman') return true;
+            
+            // Pour les autres utilisateurs, vérifier s'il y a des rôles disponibles
+            const userRole = currentUser.typeDeveloppeur;
+            const members = project.members || [];
+            
+            if (userRole === "FullStack") {
+                // Un FullStack peut prendre BackEnd, FrontEnd ou FullStack si disponible
+                const backendTaken = members.some(member => member.role.replace(/['"\\]+/g, '') === "BackEnd");
+                const frontendTaken = members.some(member => member.role.replace(/['"\\]+/g, '') === "FrontEnd");
+                const fullstackTaken = members.some(member => member.role.replace(/['"\\]+/g, '') === "FullStack");
+                
+                // Si FullStack est libre, ou si seulement BackEnd ou FrontEnd est pris
+                return !fullstackTaken || (!backendTaken || !frontendTaken);
+            } else {
+                // Pour les autres rôles, vérifier si le rôle spécifique est libre
+                const roleTaken = members.some(member => 
+                    member.role.replace(/['"\\]+/g, '') === userRole
+                );
+                return !roleTaken;
+            }
+        }
+
         // Si aucun profil n'est sélectionné, on montre tous les projets
         const hasSelectedProfiles = Object.values(selectedProfiles).some(value => value);
         if (!hasSelectedProfiles) return true;
@@ -142,6 +191,26 @@ const Projects = () => {
                 <div className='flex'>
                     <SlidersHorizontal />
                     <h2 className="ml-2 text-xl font-semibold mb-4">Filtres</h2>
+                </div>
+
+                <hr className="border-t border-gray-300 mb-4" />
+
+                {/* Filtre Mes projets */}
+                <div className="mb-4">
+                    <Checkbox
+                        label="Mes projets uniquement"
+                        checked={showMyProjectsOnly}
+                        onChange={() => setShowMyProjectsOnly(!showMyProjectsOnly)}
+                    />
+                </div>
+
+                {/* Filtre Projets disponibles */}
+                <div className="mb-6">
+                    <Checkbox
+                        label="Projets où je peux m'inscrire"
+                        checked={showAvailableProjectsOnly}
+                        onChange={() => setShowAvailableProjectsOnly(!showAvailableProjectsOnly)}
+                    />
                 </div>
 
                 <hr className="border-t border-gray-300 mb-4" />
