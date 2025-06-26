@@ -50,6 +50,10 @@ def update_profile():
     user.email = data.get("email", user.email)
     user.typeDeveloppeur = data.get("typeDeveloppeur", user.typeDeveloppeur)
     user.technologies = ','.join(data.get("technologies", user.technologies.split(',')))
+    
+    # Permettre la mise à jour du school_id pour les étudiants
+    if 'school_id' in data and user.role == 'student':
+        user.school_id = data.get("school_id")
 
     try:
         db.session.commit()
@@ -59,7 +63,8 @@ def update_profile():
             "role": user.role,
             "email": user.email,
             "typeDeveloppeur": user.typeDeveloppeur,
-            "technologies": user.technologies.split(',')
+            "technologies": user.technologies.split(','),
+            "school_id": user.school_id
         }), 200
     except Exception as e:
         db.session.rollback()

@@ -120,11 +120,22 @@ const NavBar = ({
                                     <NavLink to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                         Profil
                                     </NavLink>
+                                    <div className="border-t border-gray-100 my-1"></div>
+                                    <NavLink to="/dashboard/subscription" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        Mon Abonnement
+                                    </NavLink>
+                                    <NavLink to="/dashboard/invoices" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        Mes Factures
+                                    </NavLink>
                                     {currentUser.role === "admin" && (
-                                        <NavLink to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                            Admin
-                                        </NavLink>
+                                        <>
+                                            <div className="border-t border-gray-100 my-1"></div>
+                                            <NavLink to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                Admin
+                                            </NavLink>
+                                        </>
                                     )}
+                                    <div className="border-t border-gray-100 my-1"></div>
                                     <button
                                         onClick={handleLogout}
                                         className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100"
