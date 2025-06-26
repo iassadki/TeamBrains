@@ -10,8 +10,8 @@ const TabsList = ({ children, className = '' }) => {
 };
 
 // Composant TabsTrigger
-const TabsTrigger = ({ children, value, className = '', ...props }) => {
-    const isActive = props.value === value;
+const TabsTrigger = ({ children, value: triggerValue, className = '', currentValue, onValueChange, ...props }) => {
+    const isActive = currentValue === triggerValue;
 
     return (
         <button
@@ -19,8 +19,8 @@ const TabsTrigger = ({ children, value, className = '', ...props }) => {
                     ? 'border-b-2 border-green-500 text-green-600'
                     : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } ${className}`}
-            onClick={() => props.onValueChange?.(value)}
-            {...props}
+            onClick={() => onValueChange?.(triggerValue)}
+            type="button"
         >
             {children}
         </button>
@@ -28,13 +28,13 @@ const TabsTrigger = ({ children, value, className = '', ...props }) => {
 };
 
 // Composant TabsContent
-const TabsContent = ({ children, value, className = '', ...props }) => {
-    const isActive = props.value === value;
+const TabsContent = ({ children, value: contentValue, className = '', currentValue, ...props }) => {
+    const isActive = currentValue === contentValue;
 
     if (!isActive) return null;
 
     return (
-        <div className={className} {...props}>
+        <div className={className}>
             {children}
         </div>
     );
@@ -42,16 +42,13 @@ const TabsContent = ({ children, value, className = '', ...props }) => {
 
 // Composant Tabs principal
 const Tabs = ({ children, defaultValue, value, onValueChange, className = '', ...props }) => {
-    // Si value et onValueChange sont fournis, c'est un composant contrôlé
-    // Sinon, il faudrait gérer l'état en interne
-
     return (
-        <div className={`w-full ${className}`} {...props}>
+        <div className={`w-full ${className}`}>
             {React.Children.map(children, (child) => {
                 if (!React.isValidElement(child)) return child;
 
                 return React.cloneElement(child, {
-                    value,
+                    currentValue: value,
                     onValueChange,
                     defaultValue,
                 });

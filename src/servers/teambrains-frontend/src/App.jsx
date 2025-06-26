@@ -15,6 +15,7 @@ import ProjectDetail from './components/ProjectDetail';
 import AdminPanel from './components/Admins/AdminPanel';
 import AccessDenied from './components/AccessDenied';
 import Contact from './components/Contact';
+import PricingPage from './components/PricingPage';
 import Modal from './components/Modal';
 
 const App = () => {
@@ -62,6 +63,7 @@ const App = () => {
                             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                             <Route path="/projets" element={<Projects />} />
                             <Route path="/contact" element={<Contact />} />
+                            <Route path="/tarifs" element={<PricingPage />} />
                             <Route path="/projets/:slug" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
                             <Route path="/projets/nouveau-projet" element={<PrivateRoute><CreateProject /></PrivateRoute>} />
                             <Route path="/admin/*" element={

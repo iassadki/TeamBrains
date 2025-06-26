@@ -85,7 +85,9 @@ def create_task(project_id):
         percent_completion=0,
         assignee_id=data['assignee_id'] if 'assignee_id' in data else get_jwt_identity(),
         priority=data['priority'] if 'priority' in data else 'moyenne',
-        sprint=data['sprint'] if 'sprint' in data else None
+        sprint=data['sprint'] if 'sprint' in data else None,
+        file_url=data.get('file_url'),
+        file_name=data.get('file_name')
     )
 
     db.session.add(new_task)
@@ -132,6 +134,8 @@ def update_task(task_id):
     task.assignee_id = data['assignee_id'] if 'assignee_id' in data else get_jwt_identity()
     task.priority = data['priority'] if 'priority' in data else task.priority
     task.sprint = data['sprint'] if 'sprint' in data else task.sprint
+    task.file_url = data.get('file_url', task.file_url)
+    task.file_name = data.get('file_name', task.file_name)
     
     db.session.commit()
     

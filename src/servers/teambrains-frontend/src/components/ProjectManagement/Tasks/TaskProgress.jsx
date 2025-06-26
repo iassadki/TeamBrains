@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { CheckCircle, Clock, AlertTriangle, BarChart2 } from 'lucide-react';
@@ -17,57 +17,9 @@ const TaskProgress = () => {
         overdue: 0
     });
 
-    // Récupération du projet
-    useEffect(() => {
-        const fetchProject = async () => {
-            try {
-                const response = await axios.get(`http://localhost:5001/projects/get_project/${slug}`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                    }
-                });
-                setProject(response.data);
-            } catch (error) {
-                console.error('Erreur lors de la récupération du projet:', error);
-                setError("Impossible de charger les détails du projet");
-            }
-        };
 
-        fetchProject();
-    }, [slug]);
-
-    // Récupération des tâches et calcul des statistiques
-    useEffect(() => {
-        const fetchTasks = async () => {
-            if (project) {
-                try {
-                    setLoading(true);
-                    const response = await axios.get(`http://localhost:5001/planification/${project.id}/tasks`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                        }
-                    });
-
-                    const tasksList = response.data.tasks;
-                    setTasks(tasksList);
-
-                    // Calcul des statistiques
-                    calculateStats(tasksList);
-
-                    setLoading(false);
-                } catch (error) {
-                    console.error('Erreur lors de la récupération des tâches:', error);
-                    setError("Impossible de charger les tâches");
-                    setLoading(false);
-                }
-            }
-        };
-
-        fetchTasks();
-    }, [project]);
-
-    // Fonction pour calculer les statistiques des tâches
-    const calculateStats = (tasksList) => {
+    // Fonction pour calculer les statistiques des tâches (memoized)
+    const calculateStats = useCallback((tasksList) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -102,32 +54,60 @@ const TaskProgress = () => {
             pending,
             overdue
         });
-    };
+    }, []);
 
-    // Récupération de la progression globale du projet
+    // Récupération du projet - UNE SEULE FOIS
     useEffect(() => {
-        const fetchProjectProgress = async () => {
-            if (project) {
+        const fetchProject = async () => {
+            try {
+                const response = await axios.get(`http://localhost:5001/projects/get_project/${slug}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                });
+                setProject(response.data);
+            } catch (error) {
+                console.error('Erreur lors de la récupération du projet:', error);
+                setError("Impossible de charger les détails du projet");
+            }
+        };
+
+        if (slug) {
+            fetchProject();
+        }
+    }, [slug]); // Dépendance uniquement sur slug
+
+    // Récupération des tâches et calcul des statistiques
+    useEffect(() => {
+        const fetchTasks = async () => {
+            if (project?.id) {
                 try {
-                    const response = await axios.get(`http://localhost:5001/planification/${project.id}/progress`, {
+                    setLoading(true);
+                    const response = await axios.get(`http://localhost:5001/planification/${project.id}/tasks`, {
                         headers: {
                             'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
                         }
                     });
 
-                    // Mise à jour du projet avec la progression actuelle
-                    setProject({
-                        ...project,
-                        progress: response.data.progress
-                    });
+                    const tasksList = response.data.tasks;
+                    setTasks(tasksList);
+
+                    // Calcul des statistiques
+                    calculateStats(tasksList);
+
+                    setLoading(false);
                 } catch (error) {
-                    console.error('Erreur lors de la récupération de la progression:', error);
+                    console.error('Erreur lors de la récupération des tâches:', error);
+                    setError("Impossible de charger les tâches");
+                    setLoading(false);
                 }
             }
         };
 
-        fetchProjectProgress();
-    }, [tasks, project?.id]); // Exécuter à chaque modification des tâches
+        fetchTasks();
+    }, [project?.id, calculateStats]); // Dépendances optimisées
+
+
 
     if (loading) {
         return <div className="flex justify-center items-center h-full">Chargement...</div>;
@@ -139,24 +119,10 @@ const TaskProgress = () => {
 
     return (
         <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <h2 className="text-xl font-semibold mb-6 flex items-center">
                 <BarChart2 className="mr-2" size={20} />
-                Progression du projet
+                Statistiques détaillées
             </h2>
-
-            {/* Barre de progression globale */}
-            <div className="mb-6">
-                <div className="flex justify-between text-sm mb-1">
-                    <span>Progression globale</span>
-                    <span>{Math.round(project?.progress || 0)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-4">
-                    <div
-                        className="bg-green-500 h-4 rounded-full"
-                        style={{ width: `${project?.progress || 0}%` }}
-                    ></div>
-                </div>
-            </div>
 
             {/* Statistiques des tâches */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

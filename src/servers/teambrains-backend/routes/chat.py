@@ -11,8 +11,17 @@ def create_message(project_id):
     current_user_id = get_jwt_identity()
     data = request.json
     
-    if not data or not 'content' in data:
-        return jsonify({"error": "Le contenu de la message est requis"}), 400
+    if not data:
+        return jsonify({"error": "Données requises"}), 400
+    
+    # Vérifier si c'est un message texte ou avec fichier
+    content = data.get('content', '')
+    file_url = data.get('file_url')
+    file_name = data.get('file_name')
+    
+    # Au moins un contenu doit être présent (texte ou fichier)
+    if not content and not file_url:
+        return jsonify({"error": "Le contenu du message ou un fichier est requis"}), 400
     
     project = Project.query.get(project_id)
     
@@ -20,9 +29,11 @@ def create_message(project_id):
         return jsonify({"error": "Le projet spécifié n'existe pas"}), 404
     
     message = Message(
-        content=data['content'],
+        content=content,
         project_id=project_id,
-        sender_id=current_user_id
+        sender_id=current_user_id,
+        file_url=file_url,
+        file_name=file_name
     )
     
     db.session.add(message)
@@ -45,11 +56,3 @@ def get_messages(project_id):
     return jsonify({
         "messages": [message.to_dict() for message in messages]
     }), 200
-    
-    
-    
-    
-
-    
-    
-    

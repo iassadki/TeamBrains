@@ -59,6 +59,10 @@ class Message(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     sender_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Nouveaux champs pour les pièces jointes
+    file_url = db.Column(db.Text, nullable=True)
+    file_name = db.Column(db.String(255), nullable=True)
 
     def to_dict(self):
         return {
@@ -66,7 +70,9 @@ class Message(db.Model):
             'content': self.content,
             'project_id': self.project_id,
             'sender_id': self.sender_id,
-            'timestamp': self.timestamp.isoformat()
+            'timestamp': self.timestamp.isoformat(),
+            'file_url': self.file_url,
+            'file_name': self.file_name
         }
     
 
@@ -80,8 +86,13 @@ class Task(db.Model):
     percent_completion = db.Column(db.Integer, nullable=False, default=0)
     assignee_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    priority = db.Column(db.String(20), nullable=False, default='moyenne')  
+    priority = db.Column(db.String(20), nullable=True, default='moyenne')  
     sprint = db.Column(db.String(100), nullable=True) 
+
+    # Nouveaux champs pour les pièces jointes
+    file_url = db.Column(db.Text, nullable=True)
+    file_name = db.Column(db.String(255), nullable=True)
+
     
     def to_dict(self):
         return {
@@ -93,7 +104,9 @@ class Task(db.Model):
             'assignee_id': self.assignee_id,
             'project_id': self.project_id,
             'priority': self.priority,
-            'sprint': self.sprint
+            'sprint': self.sprint,
+            'file_url': self.file_url,
+            'file_name': self.file_name
         }
 
 class CVProject(db.Model):
