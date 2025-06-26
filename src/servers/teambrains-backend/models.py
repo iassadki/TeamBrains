@@ -109,9 +109,13 @@ class Task(db.Model):
             'project_id': self.project_id,
             'priority': self.priority,
             'sprint': self.sprint,
-            'file_url': self.file_url,
-            'file_name': self.file_name
+            'assigned_students': [ts.to_dict() for ts in self.task_students] if hasattr(self, 'task_students') else [],
+            'subtasks_count': len(self.subtasks) if hasattr(self, 'subtasks') else 0
         }
+    
+    def get_assigned_students(self):
+        """Méthode helper pour récupérer les étudiants assignés"""
+        return [ts.student for ts in self.task_students]
 
 class CVProject(db.Model):
     __tablename__ = 'cv_projects'
@@ -367,4 +371,86 @@ class Invoice(db.Model):
             'due_date': self.due_date.isoformat() if self.due_date else None,
             'paid_at': self.paid_at.isoformat() if self.paid_at else None,
             'created_at': self.created_at.isoformat()
+        }
+    
+class TaskStudent(db.Model):
+    __tablename__ = 'task_students'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False)
+    student_id = db.Column(db.String(100), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    role = db.Column(db.String(100), nullable=True, default='développeur')
+    assigned_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relations
+    task = db.relationship('Task', backref=db.backref('task_students', lazy=True, cascade='all, delete-orphan'))
+    student = db.relationship('User', backref=db.backref('student_tasks', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'task_id': self.task_id,
+            'student_id': self.student_id,
+            'student_name': f"{self.student.prenom} {self.student.nom}" if self.student else "Inconnu",
+            'student_email': self.student.email if self.student else None,
+            'role': self.role,
+            'assigned_date': self.assigned_date.isoformat()
+        }
+
+class SubTask(db.Model):
+    __tablename__ = 'subtasks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    due_date = db.Column(db.DateTime, nullable=True)
+    percent_completion = db.Column(db.Integer, nullable=False, default=0)
+    priority = db.Column(db.String(20), nullable=False, default='moyenne')
+    status = db.Column(db.String(50), nullable=False, default='pending')
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False)
+    assigned_student_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=True)
+    created_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relations
+    task = db.relationship('Task', backref=db.backref('subtasks', lazy=True, cascade='all, delete-orphan'))
+    assigned_student = db.relationship('User', backref=db.backref('assigned_subtasks', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'percent_completion': self.percent_completion,
+            'priority': self.priority,
+            'status': self.status,
+            'task_id': self.task_id,
+            'assigned_student_id': self.assigned_student_id,
+            'assigned_student_name': f"{self.assigned_student.prenom} {self.assigned_student.nom}" if self.assigned_student else None,
+            'created_date': self.created_date.isoformat()
+        }
+    
+class SubTaskValidation(db.Model):
+    __tablename__ = 'subtask_validations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    subtask_id = db.Column(db.Integer, db.ForeignKey('subtasks.id', ondelete='CASCADE'), nullable=False)
+    status = db.Column(db.String(50), nullable=False)
+    feedback = db.Column(db.Text, nullable=True)
+    validator_id = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relations
+    subtask = db.relationship('SubTask', backref=db.backref('validations', lazy=True, cascade='all, delete-orphan'))
+    validator = db.relationship('User', backref=db.backref('subtask_validations', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'subtask_id': self.subtask_id,
+            'status': self.status,
+            'feedback': self.feedback,
+            'validator_id': self.validator_id,
+            'validator_name': f"{self.validator.prenom} {self.validator.nom}" if self.validator else "Inconnu",
+            'timestamp': self.timestamp.isoformat()
         }
