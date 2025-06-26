@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Filter, X, Edit2, Trash2, User, Calendar, Clock } from 'lucide-react';
+import { Filter, X, Edit2, Trash2, User, Calendar, Clock, Paperclip } from 'lucide-react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { format, parseISO, isToday, isThisWeek, isPast, isAfter, endOfWeek } from 'date-fns';
@@ -16,6 +16,7 @@ const TaskFilters = ({
     const [project, setProject] = useState(null);
     const [allTasks, setAllTasks] = useState([]);
     const [filteredTasks, setFilteredTasks] = useState([]);
+    const [availableSprints, setAvailableSprints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -40,28 +41,39 @@ const TaskFilters = ({
         }
     }, [slug]);
 
-    // Récupération des tâches
+    // Récupération des tâches et des sprints
     useEffect(() => {
-        const fetchTasks = async () => {
+        const fetchData = async () => {
             if (project?.id) {
                 try {
                     setLoading(true);
-                    const response = await axios.get(`http://localhost:5001/planification/${project.id}/tasks`, {
+
+                    // Récupération des tâches
+                    const tasksResponse = await axios.get(`http://localhost:5001/planification/${project.id}/tasks`, {
                         headers: {
                             'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
                         }
                     });
-                    setAllTasks(response.data.tasks);
+                    setAllTasks(tasksResponse.data.tasks);
+
+                    // Récupération des sprints disponibles
+                    const sprintsResponse = await axios.get(`http://localhost:5001/sprint/${project.id}/list`, {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                        }
+                    });
+                    setAvailableSprints(sprintsResponse.data.sprints);
+
                     setLoading(false);
                 } catch (error) {
-                    console.error('Erreur lors de la récupération des tâches:', error);
-                    setError("Impossible de charger les tâches");
+                    console.error('Erreur lors de la récupération des données:', error);
+                    setError("Impossible de charger les données");
                     setLoading(false);
                 }
             }
         };
 
-        fetchTasks();
+        fetchData();
     }, [project]);
 
     // Application des filtres
@@ -73,10 +85,24 @@ const TaskFilters = ({
             filtered = filtered.filter(task => task.assignee_id === filters.assignee);
         }
 
-        // Filtre par sprint (ajouté pour la cohérence, même si non utilisé ici)
-        // if (filters.sprint) {
-        //     filtered = filtered.filter(task => task.sprint_id === filters.sprint);
-        // }
+        // Filtre par sprint
+        if (filters.sprint) {
+            if (filters.sprint === 'current') {
+                // Pour le sprint actuel, on prend le sprint le plus récent ou le plus utilisé
+                const sprintCounts = {};
+                allTasks.forEach(task => {
+                    if (task.sprint) {
+                        sprintCounts[task.sprint] = (sprintCounts[task.sprint] || 0) + 1;
+                    }
+                });
+                const currentSprint = Object.keys(sprintCounts).sort((a, b) => sprintCounts[b] - sprintCounts[a])[0];
+                if (currentSprint) {
+                    filtered = filtered.filter(task => task.sprint === currentSprint);
+                }
+            } else {
+                filtered = filtered.filter(task => task.sprint === filters.sprint);
+            }
+        }
 
         // Filtre par statut
         if (filters.status) {
@@ -96,10 +122,10 @@ const TaskFilters = ({
         if (filters.dueDate) {
             const today = new Date();
             const endOfThisWeek = endOfWeek(today, { locale: fr });
-            
+
             filtered = filtered.filter(task => {
                 const dueDate = parseISO(task.due_date);
-                
+
                 if (filters.dueDate === 'today') {
                     return isToday(dueDate);
                 } else if (filters.dueDate === 'week') {
@@ -126,7 +152,8 @@ const TaskFilters = ({
         setFilters({
             assignee: '',
             status: '',
-            dueDate: ''
+            dueDate: '',
+            sprint: ''
         });
     };
 
@@ -166,6 +193,14 @@ const TaskFilters = ({
         } else {
             return 'À faire';
         }
+    };
+
+    // Obtenir le nom du sprint affiché
+    const getSprintDisplayName = (sprintValue) => {
+        if (sprintValue === 'current') {
+            return 'Sprint actuel';
+        }
+        return sprintValue;
     };
 
     if (loading) {
@@ -211,12 +246,16 @@ const TaskFilters = ({
                     <label className="block text-xs font-medium text-gray-700 mb-1">Sprint</label>
                     <select
                         value={filters.sprint}
-                        onChange={(e) => handleFilterChange('status', e.target.value)}
+                        onChange={(e) => handleFilterChange('sprint', e.target.value)}
                         className="w-full md:w-auto text-sm p-1.5 border border-gray-300 rounded"
                     >
-                        {/* Iterer sur les sprints ?? */}
                         <option value="">Tous les sprints</option>
-                        <option value="">Sprint n</option>
+                        <option value="current">Voir le sprint actuel</option>
+                        {availableSprints.map(sprint => (
+                            <option key={sprint} value={sprint}>
+                                {sprint}
+                            </option>
+                        ))}
                     </select>
                 </div>
 
@@ -266,12 +305,18 @@ const TaskFilters = ({
                         <Filter className="mr-2" size={18} />
                         Tâches filtrées ({filteredTasks.length})
                     </h3>
-                    {(filters.assignee || filters.status || filters.dueDate) && (
+                    {(filters.assignee || filters.status || filters.dueDate || filters.sprint) && (
                         <div className="mt-2 flex flex-wrap gap-2">
                             {filters.assignee && (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                     <User size={12} className="mr-1" />
                                     Assigné: {getMemberName(filters.assignee)}
+                                </span>
+                            )}
+                            {filters.sprint && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                    <Clock size={12} className="mr-1" />
+                                    Sprint: {getSprintDisplayName(filters.sprint)}
                                 </span>
                             )}
                             {filters.status && (
@@ -280,17 +325,17 @@ const TaskFilters = ({
                                     Statut: {filters.status === 'to-do' ? 'À faire' : filters.status === 'in-progress' ? 'En cours' : 'Terminé'}
                                 </span>
                             )}
-                                                         {filters.dueDate && (
-                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                     <Calendar size={12} className="mr-1" />
-                                     Échéance: {
-                                         filters.dueDate === 'today' ? "Aujourd'hui" : 
-                                         filters.dueDate === 'week' ? 'Cette semaine' : 
-                                         filters.dueDate === 'upcoming' ? 'Prochainement' :
-                                         'En retard'
-                                     }
-                                 </span>
-                             )}
+                            {filters.dueDate && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                    <Calendar size={12} className="mr-1" />
+                                    Échéance: {
+                                        filters.dueDate === 'today' ? "Aujourd'hui" :
+                                            filters.dueDate === 'week' ? 'Cette semaine' :
+                                                filters.dueDate === 'upcoming' ? 'Prochainement' :
+                                                    'En retard'
+                                    }
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>
@@ -308,16 +353,58 @@ const TaskFilters = ({
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1">
                                         <div className="flex items-center space-x-2 mb-2">
-                                            <h4 className="font-medium text-gray-900">{task.title}</h4>
+                                            <div className="flex items-center">
+                                                <h4 className="font-medium text-gray-900">{task.title}</h4>
+                                                {task.file_url && (
+                                                    <Paperclip
+                                                        size={14}
+                                                        className="ml-2 text-gray-500"
+                                                        title="Pièce jointe"
+                                                    />
+                                                )}
+                                            </div>
                                             <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(task)}`}>
                                                 {getStatusText(task)}
                                             </span>
                                         </div>
-                                        
+
                                         {task.description && (
                                             <p className="text-sm text-gray-600 mb-2 line-clamp-2">{task.description}</p>
                                         )}
-                                        
+
+                                        {/* Affichage de la pièce jointe si elle existe */}
+                                        {task.file_url && (
+                                            <div className="mb-2">
+                                                {task.file_name && /\.(jpg|jpeg|png|gif|webp)$/i.test(task.file_name) ? (
+                                                    <div className="mt-2">
+                                                        <img
+                                                            src={task.file_url}
+                                                            alt={task.file_name}
+                                                            className="max-w-full rounded-md max-h-24 object-contain mb-1"
+                                                        />
+                                                        <a
+                                                            href={task.file_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs text-blue-600 underline"
+                                                        >
+                                                            Voir l'image: {task.file_name}
+                                                        </a>
+                                                    </div>
+                                                ) : (
+                                                    <a
+                                                        href={task.file_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-xs text-blue-600 underline flex items-center"
+                                                    >
+                                                        <Paperclip className="w-3 h-3 mr-1" />
+                                                        {task.file_name || 'Fichier joint'}
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+
                                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                                             <div className="flex items-center">
                                                 <User size={12} className="mr-1" />
@@ -327,6 +414,12 @@ const TaskFilters = ({
                                                 <Calendar size={12} className="mr-1" />
                                                 {formatDate(task.due_date)}
                                             </div>
+                                            {task.sprint && (
+                                                <div className="flex items-center">
+                                                    <span className="mr-1">🏃</span>
+                                                    Sprint: {task.sprint}
+                                                </div>
+                                            )}
                                             {task.percent_completion > 0 && task.percent_completion < 100 && (
                                                 <div className="flex items-center">
                                                     <Clock size={12} className="mr-1" />

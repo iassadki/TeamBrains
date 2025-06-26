@@ -84,8 +84,8 @@ def create_task(project_id):
         project_id=project_id,
         percent_completion=0,
         assignee_id=data['assignee_id'] if 'assignee_id' in data else get_jwt_identity(),
-        priority=data['priority'] if 'priority' in data else 'moyenne',
-        sprint=data['sprint'] if 'sprint' in data else None,
+        priority=data.get('priority', 'moyenne'),
+        sprint=data.get('sprint'),
         file_url=data.get('file_url'),
         file_name=data.get('file_name')
     )
@@ -132,8 +132,8 @@ def update_task(task_id):
     task.due_date = data['due_date']
     task.percent_completion = data['percent_completion'] if 'percent_completion' in data else task.percent_completion
     task.assignee_id = data['assignee_id'] if 'assignee_id' in data else get_jwt_identity()
-    task.priority = data['priority'] if 'priority' in data else task.priority
-    task.sprint = data['sprint'] if 'sprint' in data else task.sprint
+    task.priority = data.get('priority', task.priority)
+    task.sprint = data.get('sprint', task.sprint)
     task.file_url = data.get('file_url', task.file_url)
     task.file_name = data.get('file_name', task.file_name)
     

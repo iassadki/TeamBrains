@@ -23,9 +23,12 @@ const TaskBoard = (projectId) => {
         assignee_id: '',
         percent_completion: 0,
         file_url: '',
-        file_name: ''
+        file_name: '',
+        priority: 'moyenne',
+        sprint: ''
     });
     const [projectMembers, setProjectMembers] = useState([]);
+    const [availableSprints, setAvailableSprints] = useState([]);
     const [error, setError] = useState(null);
     const [draggedTask, setDraggedTask] = useState(null);
     const [projectProgress, setProjectProgress] = useState(0);
@@ -68,17 +71,33 @@ const TaskBoard = (projectId) => {
 
     // Récupération des tâches du projet
     useEffect(() => {
-        const fetchTasks = async () => {
+        const fetchData = async () => {
             if (project) {
                 try {
                     setLoading(true);
-                    const response = await axios.get(`http://localhost:5001/planification/${project.id}/tasks`, {
+
+                    // Récupération des tâches
+                    const tasksResponse = await axios.get(`http://localhost:5001/planification/${project.id}/tasks`, {
                         headers: {
                             'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
                         }
                     });
-                    setTasks(response.data.tasks);
-                    organizeTasks(response.data.tasks);
+                    setTasks(tasksResponse.data.tasks);
+                    organizeTasks(tasksResponse.data.tasks);
+
+                    // Récupération des sprints disponibles
+                    try {
+                        const sprintsResponse = await axios.get(`http://localhost:5001/sprint/${project.id}/list`, {
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                            }
+                        });
+                        setAvailableSprints(sprintsResponse.data.sprints);
+                    } catch (sprintError) {
+                        console.log('Aucun sprint disponible ou erreur API sprint');
+                        setAvailableSprints([]);
+                    }
+
                     setLoading(false);
                 } catch (error) {
                     console.error('Erreur lors de la récupération des tâches:', error);
@@ -88,7 +107,7 @@ const TaskBoard = (projectId) => {
             }
         };
 
-        fetchTasks();
+        fetchData();
     }, [project]);
 
     // Calcul de la progression du projet basée sur les tâches
@@ -271,7 +290,9 @@ const TaskBoard = (projectId) => {
                 due_date: formData.due_date,
                 assignee_id: formData.assignee_id || currentUser.id,
                 file_url: formData.file_url || null,
-                file_name: formData.file_name || null
+                file_name: formData.file_name || null,
+                priority: formData.priority,
+                sprint: formData.sprint || null
             };
 
             console.log('Payload envoyé:', payload);
@@ -303,7 +324,9 @@ const TaskBoard = (projectId) => {
                 assignee_id: '',
                 percent_completion: 0,
                 file_url: '',
-                file_name: ''
+                file_name: '',
+                priority: 'moyenne',
+                sprint: ''
             });
             setShowCreateForm(false);
 
@@ -325,7 +348,9 @@ const TaskBoard = (projectId) => {
                 assignee_id: formData.assignee_id,
                 percent_completion: parseInt(formData.percent_completion),
                 file_url: formData.file_url || null,
-                file_name: formData.file_name || null
+                file_name: formData.file_name || null,
+                priority: formData.priority,
+                sprint: formData.sprint || null
             };
 
             const response = await axios.put(
@@ -394,7 +419,9 @@ const TaskBoard = (projectId) => {
             assignee_id: task.assignee_id,
             percent_completion: task.percent_completion,
             file_url: task.file_url || '',
-            file_name: task.file_name || ''
+            file_name: task.file_name || '',
+            priority: task.priority || 'moyenne',
+            sprint: task.sprint || ''
         });
         setShowEditForm(true);
     };
@@ -409,7 +436,29 @@ const TaskBoard = (projectId) => {
         }
     };
 
-    // Obtenir le nom d'un membre à partir de son ID
+    // Obtenir la couleur de la priorité
+    const getPriorityColor = (priority) => {
+        switch (priority) {
+            case 'haute':
+                return 'bg-red-100 text-red-800 border-red-200';
+            case 'basse':
+                return 'bg-blue-100 text-blue-800 border-blue-200';
+            default: // moyenne
+                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        }
+    };
+
+    // Obtenir l'icône de la priorité
+    const getPriorityIcon = (priority) => {
+        switch (priority) {
+            case 'haute':
+                return '🟥';
+            case 'basse':
+                return '🟦';
+            default: // moyenne
+                return '🟧';
+        }
+    };
     const getMemberName = (userId) => {
         const member = projectMembers.find(m => m.user_id === userId);
         return member ? member.name : "Non assigné";
@@ -542,6 +591,35 @@ const TaskBoard = (projectId) => {
                                     </div>
                                 </label>
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Priorité</label>
+                                <select
+                                    name="priority"
+                                    value={formData.priority}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="basse">🟦 Basse</option>
+                                    <option value="moyenne">🟧 Moyenne</option>
+                                    <option value="haute">🟥 Haute</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Sprint</label>
+                                <select
+                                    name="sprint"
+                                    value={formData.sprint}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="">Aucun sprint</option>
+                                    {availableSprints.map(sprint => (
+                                        <option key={sprint} value={sprint}>
+                                            {sprint}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                         <div className="mt-4 flex justify-end">
                             <button
@@ -632,6 +710,35 @@ const TaskBoard = (projectId) => {
                                 </label>
                             </div>
                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Priorité</label>
+                                <select
+                                    name="priority"
+                                    value={formData.priority}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="basse">🟦 Basse</option>
+                                    <option value="moyenne">🟧 Moyenne</option>
+                                    <option value="haute">🟥 Haute</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Sprint</label>
+                                <select
+                                    name="sprint"
+                                    value={formData.sprint}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="">Aucun sprint</option>
+                                    {availableSprints.map(sprint => (
+                                        <option key={sprint} value={sprint}>
+                                            {sprint}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Progression (%)</label>
                                 <input
                                     type="number"
@@ -693,7 +800,16 @@ const TaskBoard = (projectId) => {
                                         }`}
                                 >
                                     <div className="flex justify-between items-start">
-                                        <h4 className="font-medium">{task.title}</h4>
+                                        <div className="flex items-center">
+                                            <h4 className="font-medium">{task.title}</h4>
+                                            {task.file_url && (
+                                                <Paperclip
+                                                    size={14}
+                                                    className="ml-2 text-gray-500"
+                                                    title="Pièce jointe"
+                                                />
+                                            )}
+                                        </div>
                                         <div className="flex">
                                             <button
                                                 onClick={() => openEditForm(task)}
@@ -712,6 +828,20 @@ const TaskBoard = (projectId) => {
                                     {task.description && (
                                         <p className="text-sm text-gray-600 mt-2 line-clamp-2">{task.description}</p>
                                     )}
+
+                                    {/* Badges pour priorité et sprint */}
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {task.priority && (
+                                            <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(task.priority)}`}>
+                                                {getPriorityIcon(task.priority)} {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                            </span>
+                                        )}
+                                        {task.sprint && (
+                                            <span className="px-2 py-1 text-xs rounded-full border bg-indigo-100 text-indigo-800 border-indigo-200">
+                                                🏃 {task.sprint}
+                                            </span>
+                                        )}
+                                    </div>
 
                                     {/* Affichage de la pièce jointe si elle existe */}
                                     {task.file_url && (
