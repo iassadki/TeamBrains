@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from uuid import uuid4
+import secrets
 
 db = SQLAlchemy()
 
@@ -29,6 +30,9 @@ class User(db.Model):
     linkedin_url = db.Column(db.String(255), nullable=True)
     portfolio_url = db.Column(db.String(255), nullable=True)
     github_url = db.Column(db.String(255), nullable=True)
+    
+    # Champ pour l'école de l'étudiant
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=True)
 
 
 class Project(db.Model):
@@ -189,4 +193,60 @@ class TaskValidation(db.Model):
             'validator_id': self.validator_id,
             'validator_name': f"{self.validator.prenom} {self.validator.nom}" if self.validator else "Inconnu",
             'timestamp': self.timestamp.isoformat()
+        }
+
+class School(db.Model):
+    __tablename__ = 'schools'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False, unique=True)
+    description = db.Column(db.Text, nullable=True)
+    contact_email = db.Column(db.String(255), nullable=True)
+    website = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Relations
+    students = db.relationship('User', backref=db.backref('school', lazy=True))
+    tokens = db.relationship('SchoolToken', backref=db.backref('school', lazy=True), cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'contact_email': self.contact_email,
+            'website': self.website,
+            'created_at': self.created_at.isoformat(),
+            'is_active': self.is_active,
+            'student_count': len(self.students)
+        }
+
+class SchoolToken(db.Model):
+    __tablename__ = 'school_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id', ondelete='CASCADE'), nullable=False)
+    token = db.Column(db.String(255), nullable=False, unique=True)
+    name = db.Column(db.String(255), nullable=False)  # Nom descriptif du token
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)  # Optionnel: date d'expiration
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_by = db.Column(db.String(100), nullable=True)  # Qui a créé le token
+    
+    def __init__(self, **kwargs):
+        super(SchoolToken, self).__init__(**kwargs)
+        if not self.token:
+            self.token = secrets.token_urlsafe(32)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'school_id': self.school_id,
+            'token': self.token,
+            'name': self.name,
+            'created_at': self.created_at.isoformat(),
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'is_active': self.is_active,
+            'created_by': self.created_by
         }
