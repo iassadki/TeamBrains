@@ -7,19 +7,25 @@ services:
     container_name: teambrains-frontend
     ports:
       - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - teambrains-network
 
   backend:
-      build:
-        context: ..
-        dockerfile: infrastructure/images/teambrains-backend/Dockerfile
-      container_name: teambrains-backend
-      ports:
-        - "5001:5001"
-      environment:
-        - FLASK_ENV=development
-        - FLASK_APP=app.py
-      depends_on:
-        - database
+    build:
+      context: ..
+      dockerfile: infrastructure/images/teambrains-backend/Dockerfile
+    container_name: teambrains-backend
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=app.py
+    depends_on:
+      - database
+    networks:
+      - teambrains-network
 
   database:
     image: postgres:15
@@ -32,6 +38,8 @@ services:
       - ../data/db/pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - teambrains-network
 
   pgadmin:
     container_name: teambrains-pgadmin4
@@ -42,10 +50,25 @@ services:
       PGADMIN_DEFAULT_PASSWORD: teambrains
     ports:
       - "5050:80"
+    depends_on:
+      - database
+    networks:
+      - teambrains-network
 
   mailpit:
     image: axllent/mailpit:latest
-    container_name: mailpit
+    container_name: teambrains-mailpit
+    restart: unless-stopped
+    volumes:
+      - ../data/mailpit:/data
     ports:
+      - "1025:1025"
       - "8025:8025"
-      - "1025:1025"  
+    environment:
+      MP_DATABASE: /data/mailpit.db
+    networks:
+      - teambrains-network
+
+networks:
+  teambrains-network:
+    driver: bridge  
