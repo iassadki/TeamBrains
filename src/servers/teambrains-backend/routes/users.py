@@ -36,6 +36,41 @@ def get_profile():
         "technologies": user.technologies.split(',') if user.technologies else []
     }), 200
 
+@users.route('/profile/<string:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_profile(user_id):
+    """Récupérer le profil public d'un utilisateur"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"msg": "Utilisateur non trouvé"}), 404
+
+    # Profil public - ne pas exposer l'email et d'autres infos sensibles
+    profile_data = {
+        "id": user.id,
+        "prenom": user.prenom,
+        "nom": user.nom,
+        "role": user.role,
+        "typeDeveloppeur": user.typeDeveloppeur,
+        "technologies": user.technologies.split(',') if user.technologies else [],
+        "etudes": user.etudes,
+        "ambitions": user.ambitions,
+        "linkedin_url": user.linkedin_url,
+        "portfolio_url": user.portfolio_url,
+        "github_url": user.github_url
+    }
+    
+    # Si c'est un étudiant, inclure les infos de l'école
+    if user.role == 'student' and user.school_id:
+        from models import School
+        school = School.query.get(user.school_id)
+        if school:
+            profile_data["school"] = {
+                "id": school.id,
+                "name": school.name
+            }
+
+    return jsonify(profile_data), 200
+
 @users.route('/profile', methods=['PUT'])
 @jwt_required()
 def update_profile():

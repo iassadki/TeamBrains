@@ -4,6 +4,7 @@ import logo from "../assets/logo_teambrains.svg";
 import { CircleUserRound, Menu, X, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import GlobalSearch from './GlobalSearch';
 
 const NavBar = ({ 
     openSignInModal, 
@@ -69,11 +70,7 @@ const NavBar = ({
 
                 {/* Barre de recherche - visible uniquement sur les écrans moyens et grands */}
                 <div className="hidden md:flex flex-1 mx-4">
-                    <input
-                        type="text"
-                        placeholder="Rechercher..."
-                        className="text-xs w-3/4 p-2 rounded bg-gray-100"
-                    />
+                    <GlobalSearch />
                 </div>
 
                 {/* Liens de navigation - visibles sur les écrans moyens et grands */}
@@ -183,11 +180,7 @@ const NavBar = ({
             {/* Barre de recherche mobile - affichée conditionnellement */}
             {isSearchOpen && (
                 <div className="md:hidden pt-2 pb-2 px-4">
-                    <input
-                        type="text"
-                        placeholder="Rechercher..."
-                        className="text-xs w-full p-2 rounded bg-gray-100"
-                    />
+                    <GlobalSearch isMobile={true} onClose={() => setIsSearchOpen(false)} />
                 </div>
             )}
 

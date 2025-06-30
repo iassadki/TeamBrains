@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { NavLink } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
@@ -19,9 +19,11 @@ const Projects = () => {
     const [isExpandedLangage, setIsExpandedLangage] = useState(true);
     const [sortOrder, setSortOrder] = useState('newest');
     const navigate = useNavigate();
+    const location = useLocation();
     const [showFilters, setShowFilters] = useState(false);
     const [showMyProjectsOnly, setShowMyProjectsOnly] = useState(false);
     const [showAvailableProjectsOnly, setShowAvailableProjectsOnly] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     
     const [selectedProfiles, setSelectedProfiles] = useState({
         FullStack: false,
@@ -85,6 +87,13 @@ const Projects = () => {
 
 
     useEffect(() => {
+        // Gérer les paramètres de recherche depuis l'URL
+        const searchParams = new URLSearchParams(location.search);
+        const searchFromUrl = searchParams.get('search');
+        if (searchFromUrl) {
+            setSearchQuery(searchFromUrl);
+        }
+
         const fetchProjects = async () => {
             try {
                 const response = await axios.get('http://localhost:5001/projects/list_projects', {
@@ -100,7 +109,7 @@ const Projects = () => {
         };
 
         fetchProjects();
-    }, []);
+    }, [location.search]);
 
     const formatDate = (isoDate) => {
         const date = parseISO(isoDate);
@@ -109,6 +118,18 @@ const Projects = () => {
     };
 
     const filteredProjects = sortedProjects.filter(project => {
+        // Filtre de recherche textuelle
+        if (searchQuery && searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            const nameMatch = project.name.toLowerCase().includes(query);
+            const descriptionMatch = project.description && project.description.toLowerCase().includes(query);
+            const statusMatch = project.status && project.status.toLowerCase().includes(query);
+            
+            if (!nameMatch && !descriptionMatch && !statusMatch) {
+                return false;
+            }
+        }
+
         // Filtre "Mes projets" - vérifie si l'utilisateur est membre du projet ou créateur
         if (showMyProjectsOnly) {
             const isCreator = currentUser && project.creator_id === currentUser.id;
@@ -283,6 +304,22 @@ const Projects = () => {
                     <div>
                         <h1 className="text-2xl md:text-3xl font-semibold">Rejoindre un projet</h1>
                         <p className="text-sm text-gray-500 font-light mt-1 w-full sm:w-4/5">Explorez les projets actuels à la recherche de talents. Faites votre choix et contribuez à des initiatives innovantes.</p>
+                        {searchQuery && (
+                            <div className="mt-2 flex items-center">
+                                <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                    Recherche : "{searchQuery}"
+                                </span>
+                                <button
+                                    onClick={() => {
+                                        setSearchQuery('');
+                                        navigate('/projets');
+                                    }}
+                                    className="ml-2 text-gray-500 hover:text-gray-700"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {currentUser && currentUser.role === "businessman" && (

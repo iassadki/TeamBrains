@@ -21,6 +21,7 @@ from routes.schools import schools_bp
 from routes.stripe_integration import stripe_bp
 from routes.school_partnership import school_partnership_bp
 from routes.stripe_partnership import stripe_partnership_bp
+from routes.search import search_bp
 
 
 load_dotenv()
@@ -45,6 +46,7 @@ app.register_blueprint(schools_bp)
 app.register_blueprint(stripe_bp)
 app.register_blueprint(school_partnership_bp)
 app.register_blueprint(stripe_partnership_bp)
+app.register_blueprint(search_bp, url_prefix='/search')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['JWT_SECRET_KEY'] = 'wdgQWWUKwT17lCz1'
