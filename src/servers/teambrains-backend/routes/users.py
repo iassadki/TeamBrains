@@ -86,6 +86,79 @@ def get_all_users():
 
     return jsonify(users_data), 200
 
+@users.route('/delete_account', methods=['DELETE'])
+@jwt_required()
+def delete_own_account():
+    """Permet à un utilisateur de supprimer son propre compte (RGPD) avec anonymisation"""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "Utilisateur non trouvé"}), 404
+
+    # Vérifier le mot de passe pour sécuriser l'opération
+    data = request.get_json()
+    password = data.get('password')
+    
+    if not password:
+        return jsonify({"message": "Mot de passe requis pour supprimer le compte"}), 400
+    
+    # Vérifier le mot de passe (utiliser bcrypt comme dans les autres routes)
+    import bcrypt
+    if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+        return jsonify({"message": "Mot de passe incorrect"}), 400
+
+    try:
+        # Importer les modèles nécessaires pour l'anonymisation
+        from models import Task, project_members
+        import uuid
+        
+        # Vérifier si l'utilisateur participe à des projets/tâches
+        has_project_data = db.session.query(project_members).filter_by(user_id=user_id).count() > 0
+        has_tasks = Task.query.filter_by(assignee_id=user_id).count() > 0
+        
+        if has_project_data or has_tasks:
+            # ANONYMISATION : remplacer les données personnelles par des données anonymes
+            anonymous_id = f"utilisateur-supprime-{str(uuid.uuid4())[:8]}"
+            
+            user.prenom = "Utilisateur"
+            user.nom = "Supprimé"
+            user.email = f"{anonymous_id}@supprime.local"
+            user.password = "COMPTE_SUPPRIME"
+            user.technologies = ""
+            user.typeDeveloppeur = ""
+            
+            # Anonymiser aussi les données CV stockées dans le modèle User
+            user.etudes = ""
+            user.ambitions = ""
+            user.linkedin_url = ""
+            user.portfolio_url = ""
+            user.github_url = ""
+            
+            # Note: is_active n'existe pas dans le modèle User, on le retire
+            
+            # Conserver les associations aux projets et tâches mais avec utilisateur anonymisé
+            db.session.commit()
+            
+            return jsonify({
+                "message": "Compte supprimé avec succès. Vos données personnelles ont été effacées et vos contributions aux projets ont été anonymisées conformément au RGPD."
+            }), 200
+            
+        else:
+            # SUPPRESSION COMPLETE : pas de données collaboratives
+            db.session.delete(user)
+            db.session.commit()
+            
+            return jsonify({
+                "message": "Compte supprimé avec succès. Toutes vos données ont été effacées conformément au RGPD."
+            }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "message": "Erreur lors de la suppression du compte", 
+            "error": str(e)
+        }), 500
+
 @users.route('/delete_user/<string:user_id>', methods=['DELETE'])
 @jwt_required()
 @role_required('admin')
