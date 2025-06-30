@@ -7,6 +7,7 @@ import Footer from './components/Footer';
 import SignUp from './components/SignUp/Signup';
 import SignIn from './components/SignIn';
 import Profile from './components/Profile';
+import UserProfile from './components/UserProfile';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Projects from './components/Projects';
@@ -69,6 +70,7 @@ const App = () => {
                             <Route path="/inscription" element={<SignUp />} />
                             <Route path="/connexion" element={<SignIn onSuccessfulLogin={closeModals} />} />
                             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+                            <Route path="/users/profile/:userId" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
                             <Route path="/projets" element={<Projects />} />
                             <Route path="/contact" element={<Contact />} />
                             <Route path="/tarifs" element={<PricingPage />} />
