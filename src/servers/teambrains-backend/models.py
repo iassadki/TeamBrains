@@ -2,6 +2,8 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from uuid import uuid4
 import secrets
+import random
+import string
 
 db = SQLAlchemy()
 
@@ -251,6 +253,69 @@ class SchoolToken(db.Model):
             'created_by': self.created_by
         }
 
+class SchoolRegistrationToken(db.Model):
+    """Tokens pour l'inscription des étudiants via l'espace partenariat écoles"""
+    __tablename__ = 'school_registration_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id', ondelete='CASCADE'), nullable=False)
+    token = db.Column(db.String(255), nullable=False, unique=True)
+    name = db.Column(db.String(255), nullable=False)  # Nom descriptif du token (ex: "Promotion 2024")
+    description = db.Column(db.Text, nullable=True)  # Description optionnelle
+    max_uses = db.Column(db.Integer, nullable=True)  # Nombre maximum d'utilisations (optionnel)
+    current_uses = db.Column(db.Integer, nullable=False, default=0)  # Utilisations actuelles
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)  # Date d'expiration optionnelle
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_by = db.Column(db.String(100), db.ForeignKey('users.id'), nullable=True)  # Admin qui a créé le token
+    
+    # Relations
+    school = db.relationship('School', backref=db.backref('registration_tokens', lazy=True))
+    creator = db.relationship('User', backref=db.backref('created_registration_tokens', lazy=True))
+    
+    def __init__(self, **kwargs):
+        super(SchoolRegistrationToken, self).__init__(**kwargs)
+        if not self.token:
+            # Générer un code plus court et lisible pour les étudiants (ex: ABC123)
+            self.token = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    
+    def can_be_used(self):
+        """Vérifier si le token peut encore être utilisé"""
+        if not self.is_active:
+            return False
+        
+        if self.expires_at and self.expires_at < datetime.utcnow():
+            return False
+            
+        if self.max_uses and self.current_uses >= self.max_uses:
+            return False
+            
+        return True
+    
+    def use_token(self):
+        """Incrémenter le compteur d'utilisation"""
+        self.current_uses += 1
+        db.session.commit()
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'school_id': self.school_id,
+            'school_name': self.school.name if self.school else None,
+            'token': self.token,
+            'name': self.name,
+            'description': self.description,
+            'max_uses': self.max_uses,
+            'current_uses': self.current_uses,
+            'remaining_uses': (self.max_uses - self.current_uses) if self.max_uses else None,
+            'created_at': self.created_at.isoformat(),
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'is_active': self.is_active,
+            'can_be_used': self.can_be_used(),
+            'created_by': self.created_by,
+            'creator_name': f"{self.creator.prenom} {self.creator.nom}" if self.creator else None
+        }
+
 class Subscription(db.Model):
     __tablename__ = 'subscriptions'
     
@@ -312,20 +377,28 @@ class Subscription(db.Model):
             'has_payment_issues': (self.payment_failed_count or 0) > 0 or (self.payment_method_action_required or False)
         }
         
-        # Ajouter les champs spécifiques aux écoles
-        if self.plan_type == 'school':
+        # Ajouter les champs spécifiques aux écoles (pour les plans 'school' et 'school_partnership')
+        if self.plan_type in ['school', 'school_partnership']:
+            # Pour le plan partenariat, utiliser les montants réels stockés
+            if self.plan_type == 'school_partnership':
+                total_amount = self.total_monthly_amount or 0
+                student_price = self.student_price_per_month or 500  # 5€ pour le partenariat
+            else:
+                total_amount = calculated_total
+                student_price = self.student_price_per_month or 200  # 2€ pour le plan normal
+            
             result.update({
                 'school_id': self.school_id,
-                'base_plan_amount': self.base_plan_amount or 12000,
-                'base_plan_amount_euros': (self.base_plan_amount or 12000) / 100,
-                'student_price_per_month': self.student_price_per_month or 200,
-                'student_price_per_month_euros': (self.student_price_per_month or 200) / 100,
+                'base_plan_amount': self.base_plan_amount or (12000 if self.plan_type == 'school' else 0),
+                'base_plan_amount_euros': (self.base_plan_amount or (12000 if self.plan_type == 'school' else 0)) / 100,
+                'student_price_per_month': student_price,
+                'student_price_per_month_euros': student_price / 100,
                 'current_student_count': self.current_student_count or 0,
                 'last_student_count_update': self.last_student_count_update.isoformat() if self.last_student_count_update else None,
-                'total_monthly_amount': calculated_total,
-                'total_monthly_amount_euros': calculated_total / 100 if calculated_total else None,
-                'total_yearly_amount': calculated_total * 12 if calculated_total else None,
-                'total_yearly_amount_euros': (calculated_total * 12) / 100 if calculated_total else None
+                'total_monthly_amount': total_amount,
+                'total_monthly_amount_euros': total_amount / 100 if total_amount else None,
+                'total_yearly_amount': total_amount * 12 if total_amount else None,
+                'total_yearly_amount_euros': (total_amount * 12) / 100 if total_amount else None
             })
         
         return result

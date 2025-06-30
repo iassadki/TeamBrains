@@ -7,15 +7,7 @@ const PricingPage = () => {
     const token = currentUser?.accessToken;
     const [loading, setLoading] = useState(null);
     const [error, setError] = useState('');
-    const [studentCount, setStudentCount] = useState(10); // Valeur par défaut
 
-    // Fonction pour calculer le prix dynamique de l'école
-    const calculateSchoolPrice = (students) => {
-        const basePriceYearly = 120; // 120€ de base par an
-        const studentPriceMonthly = 2; // 2€ par étudiant par mois
-        const studentPriceYearly = students * studentPriceMonthly * 12;
-        return basePriceYearly + studentPriceYearly;
-    };
 
 
     
@@ -39,35 +31,7 @@ const PricingPage = () => {
                 'Support par email',
                 'Interface moderne et intuitive'
             ],
-            badge: null
-        },
-        {
-            id: 'school',
-            name: 'Plan École (Hybride)',
-            description: 'Tarification flexible basée sur le nombre d\'étudiants',
-            price: `${calculateSchoolPrice(studentCount)}€`,
-            period: '/an',
-            annually: `120€ base + ${studentCount} × 2€/mois`,
-            icon: <Users className="w-8 h-8 text-green-600" />,
-            color: 'green',
-            stripeUrl: 'https://buy.stripe.com/test_dRm7sE7Fv11l8VZ2kd0x201',
-            features: [
-                'Plan de base: 120€/an (10€/mois)',
-                'Compteur d\'étudiants: 2€/mois par étudiant',
-                'Facturation automatique selon le nombre d\'étudiants',
-                'Tableau de bord administrateur',
-                'Gestion avancée des utilisateurs',
-                'Rapports et analyses détaillés',
-                'Support prioritaire 24/7',
-                'Formation et onboarding',
-                'API et intégrations',
-                'Stockage étendu',
-                'Sauvegardes automatiques'
-            ],
-            badge: 'Recommandé',
-            isHybrid: true,
-            currentStudentCount: studentCount,
-            totalPrice: calculateSchoolPrice(studentCount)
+            badge: 'Recommandé'
         }
     ];
 
@@ -77,13 +41,7 @@ const PricingPage = () => {
             return;
         }
 
-        // Validation basique pour le plan école
-        if (planId === 'school') {
-            if (studentCount < 1) {
-                setError('Le nombre d\'étudiants doit être d\'au moins 1.');
-                return;
-            }
-        }
+
 
         setLoading(planId);
         setError('');
@@ -96,10 +54,7 @@ const PricingPage = () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    plan_type: planId,
-                    ...(planId === 'school' && {
-                        student_count: studentCount
-                    })
+                    plan_type: planId
                 })
             });
 
@@ -145,11 +100,11 @@ const PricingPage = () => {
                 {/* En-tête */}
                 <div className="text-center mb-16">
                     <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                        Choisissez votre plan TeamBrains
+                        Plan TeamBrains Étudiant
                     </h1>
                     <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                        Découvrez la solution de gestion de projets étudiants qui transforme 
-                        votre façon de collaborer et d'apprendre
+                        La solution de gestion de projets conçue spécialement pour les étudiants. 
+                        Collaborez, apprenez et réussissez vos projets académiques !
                     </p>
                     {error && (
                         <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg max-w-md mx-auto">
@@ -163,96 +118,10 @@ const PricingPage = () => {
                     )}
                 </div>
 
-                {/* Configurateur pour le plan école */}
-                {token && (
-                    <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl shadow-lg p-8 mb-8">
-                        <div className="text-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                                🏫 Configurez votre Plan École
-                            </h2>
-                            <p className="text-gray-600">
-                                Ajustez le nombre d'étudiants pour voir le prix personnalisé
-                            </p>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                            {/* Information sur la configuration */}
-                            <div>
-                                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                    <h4 className="font-medium text-blue-900 mb-2">
-                                        🎓 Configurateur de tarification
-                                    </h4>
-                                    <p className="text-sm text-blue-800 mb-2">
-                                        Ajustez le nombre d'étudiants pour voir le prix personnalisé de votre plan École.
-                                    </p>
-                                    <div className="text-xs text-blue-700 space-y-1">
-                                        <div>• Plan de base : 120€/an (fixe)</div>
-                                        <div>• Prix par étudiant : 2€/mois (24€/an)</div>
-                                        <div>• Association école : configurable après paiement</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Sélection du nombre d'étudiants */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Nombre d'étudiants
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type="range"
-                                        min="1"
-                                        max="500"
-                                        value={studentCount}
-                                        onChange={(e) => setStudentCount(parseInt(e.target.value))}
-                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                                    />
-                                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                        <span>1</span>
-                                        <span>500</span>
-                                    </div>
-                                </div>
-                                <div className="mt-2 text-center">
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="500"
-                                        value={studentCount}
-                                        onChange={(e) => setStudentCount(Math.max(1, Math.min(500, parseInt(e.target.value) || 1)))}
-                                        className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-600">étudiants</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        {/* Aperçu du calcul */}
-                        <div className="mt-6 p-4 bg-white rounded-lg border-l-4 border-green-500 max-w-2xl mx-auto">
-                            <h4 className="font-semibold text-gray-900 mb-2">💰 Calcul de votre tarif :</h4>
-                            <div className="space-y-1 text-sm text-gray-700">
-                                <div className="flex justify-between">
-                                    <span>Plan de base (annuel) :</span>
-                                    <span className="font-medium">120€</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>{studentCount} étudiants × 2€/mois × 12 mois :</span>
-                                    <span className="font-medium">{studentCount * 2 * 12}€</span>
-                                </div>
-                                <hr className="my-2" />
-                                <div className="flex justify-between text-lg font-bold text-green-600">
-                                    <span>Total annuel :</span>
-                                    <span>{calculateSchoolPrice(studentCount)}€</span>
-                                </div>
-                                <div className="text-xs text-gray-500 text-center mt-2">
-                                    Soit {(calculateSchoolPrice(studentCount) / 12).toFixed(2)}€ par mois
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
-                {/* Cartes de tarification */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+
+                {/* Carte de tarification */}
+                <div className="max-w-md mx-auto mb-12">
                     {plans.map((plan) => (
                         <div
                             key={plan.id}
@@ -353,64 +222,28 @@ const PricingPage = () => {
                     ))}
                 </div>
 
-                {/* Explication du plan hybride école */}
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl shadow-lg p-8 mb-12">
-                    <div className="text-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                            🏫 Comment fonctionne le Plan École Hybride ?
+
+
+                {/* Section École */}
+                <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl shadow-lg p-8 mb-12">
+                    <div className="text-center">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                            🏫 Vous êtes une école ?
                         </h2>
-                        <p className="text-gray-600">
-                            Une tarification juste et transparente qui s'adapte à la taille de votre établissement
+                        <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
+                            Découvrez notre espace partenariat dédié aux établissements d'enseignement 
+                            avec des tarifs préférentiels et des fonctionnalités adaptées à vos besoins.
                         </p>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white rounded-lg p-6 shadow-sm">
-                            <div className="text-center">
-                                <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <span className="text-2xl">🏗️</span>
-                                </div>
-                                <h3 className="font-semibold text-lg mb-2">Plan de base</h3>
-                                <div className="text-3xl font-bold text-green-600 mb-2">120€/an</div>
-                                <p className="text-gray-600 text-sm">
-                                    Accès complet à la plateforme, gestion illimitée des projets et fonctionnalités admin
-                                </p>
+                        <div className="space-y-4 sm:space-y-0 sm:space-x-4 sm:flex sm:justify-center">
+                            <a 
+                                href="/partenariat-ecole" 
+                                className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 hover:scale-105"
+                            >
+                                Découvrir l'espace école
+                            </a>
+                            <div className="text-sm text-gray-500">
+                                Tarif : 5€/étudiant/mois
                             </div>
-                        </div>
-                        
-                        <div className="bg-white rounded-lg p-6 shadow-sm">
-                            <div className="text-center">
-                                <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <span className="text-2xl">👥</span>
-                                </div>
-                                <h3 className="font-semibold text-lg mb-2">Par étudiant</h3>
-                                <div className="text-3xl font-bold text-blue-600 mb-2">2€/mois</div>
-                                <p className="text-gray-600 text-sm">
-                                    Facturation automatique basée sur le nombre d'étudiants inscrits dans votre école
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-white rounded-lg p-6 shadow-sm">
-                            <div className="text-center">
-                                <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <span className="text-2xl">⚡</span>
-                                </div>
-                                <h3 className="font-semibold text-lg mb-2">Automatique</h3>
-                                <div className="text-lg font-bold text-purple-600 mb-2">Mise à jour auto</div>
-                                <p className="text-gray-600 text-sm">
-                                    Le montant s'ajuste automatiquement quand de nouveaux étudiants rejoignent votre école
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="mt-8 p-4 bg-white rounded-lg border-l-4 border-green-500">
-                        <h4 className="font-semibold text-gray-900 mb-2">💡 Exemple de calcul :</h4>
-                        <div className="text-sm text-gray-700 space-y-1">
-                            <div>• École avec 50 étudiants : 120€/an + (50 × 2€ × 12 mois) = <strong>1 320€/an</strong></div>
-                            <div>• École avec 100 étudiants : 120€/an + (100 × 2€ × 12 mois) = <strong>2 520€/an</strong></div>
-                            <div className="text-green-600 font-medium mt-2">✓ Facturation transparente et équitable pour toutes les tailles d'établissements</div>
                         </div>
                     </div>
                 </div>
