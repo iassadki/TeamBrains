@@ -54,8 +54,8 @@ def get_cv_projects():
     
     query = CVProject.query.filter_by(user_id=user_id)
     
-    if not include_hidden:
-        query = query.filter_by(is_visible=True)
+    # if not include_hidden:
+    #     query = query.filter_by(is_visible=True) Décommenter
     
     cv_projects = query.all()
     cv_projects_list = []
@@ -95,7 +95,7 @@ def get_cv_projects():
                     'end_date': None,
                     'team_size': team_size,
                     'description': project.description,
-                    'is_visible': True,  
+                    # 'is_visible': True,  Décommenter
                     'tasks': [task.to_dict() for task in user_tasks]
                 }
                 cv_projects_list.append(created_cv_project)
