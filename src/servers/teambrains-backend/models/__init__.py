@@ -3,10 +3,10 @@
 from .base import db, get_uuid
 
 # Import des modèles utilisateur
-from .user import User
+from .user import User, Skill, UserSkill, CVVisibility
 
 # Import des modèles de projet et tâches
-from .project import Project, project_members, Message, Task, CVProject, TaskValidation
+from .project import Project, project_members, Message, Task, CVProject, TaskValidation, SubTask, SubTaskValidation, TaskStudent
 
 # Import des modèles de fichiers
 from .file import FileDocument
@@ -20,8 +20,8 @@ from .subscription import Subscription, Invoice
 # Export de tous les modèles pour maintenir la compatibilité
 __all__ = [
     'db', 'get_uuid',
-    'User',
-    'Project', 'project_members', 'Message', 'Task', 'CVProject', 'TaskValidation',
+    'User', 'Skill', 'UserSkill', 'CVVisibility',
+    'Project', 'project_members', 'Message', 'Task', 'CVProject', 'TaskValidation', 'SubTask', 'SubTaskValidation', 'TaskStudent',
     'FileDocument',
     'School', 'SchoolToken', 'SchoolRegistrationToken',
     'Subscription', 'Invoice'
