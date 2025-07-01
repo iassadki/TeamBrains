@@ -8,9 +8,10 @@ const TechnicalSkillsSection = ({ userInfo, setUserInfo, isEditable, handleSelec
         Designer: ["Figma", "Sketch", "Adobe XD", "Photoshop", "Illustrator"],
     };
 
-    const techsToDisplay = technologies[userInfo.typeDeveloppeur] || [];
+    const techsToDisplay = technologies[userInfo?.typeDeveloppeur] || [];
 
-    if (userInfo.role === 'businessman') {
+    // Ne pas afficher si userInfo n'est pas chargé OU n'a pas de rôle OU est businessman
+    if (!userInfo || !userInfo.role || userInfo.role === 'businessman') {
         return null;
     }
 

@@ -8,13 +8,15 @@ import ProfileHeader from './Profile/ProfileHeader';
 import PersonalInfoSection from './Profile/PersonalInfoSection';
 import SocialLinksSection from './Profile/SocialLinksSection';
 import TechnicalSkillsSection from './Profile/TechnicalSkillsSection';
-import ObjectivesSection from './Profile/ObjectivesSection'; 
+// import SkillsManagementSection from './Profile/SkillsManagementSectionOLD';
+import ObjectivesSection from './Profile/ObjectivesSection';
 import EducationSection from './Profile/EducationSection';
 import ProjectsSection from './Profile/ProjectsSection';
 import ActionButtons from './Profile/ActionButtons';
 import DangerZone from './Profile/DangerZone';
 
-import DeleteAccountModal from './Profile/Modals/DeleteAccountModal'; 
+// Modals
+import DeleteAccountModal from './Profile/Modals/DeleteAccountModal';
 import ProjectDetailsModal from './Profile/Modals/ProjectDetailsModal';
 
 const Profile = () => {
@@ -251,6 +253,11 @@ const Profile = () => {
                             isEditable={isEditable}
                             handleSelectTech={handleSelectTech}
                         />
+
+                        {/* Nouvelle section de gestion des compétences */}
+                        {/* <SkillsManagementSection
+                            userInfo={userInfo}
+                        /> */}
                     </div>
 
                     {/* Colonne de droite */}
