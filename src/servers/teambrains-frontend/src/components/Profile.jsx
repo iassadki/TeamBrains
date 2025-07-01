@@ -9,6 +9,7 @@ const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
     const [feedback, setFeedback] = useState([]);
     const [validationStats, setValidationStats] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [teamMembers, setTeamMembers] = useState([]); // Ilias ajout
 
     useEffect(() => {
         if (isOpen && projectId) {
@@ -133,25 +134,7 @@ const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
                                 </div>
 
                                 <div className="space-y-4">
-                                    {subtasks.map((task) => (
-                                        <div key={task.task_id} className="bg-gray-50 p-4 rounded-lg">
-                                            <h4 className="font-semibold text-gray-800 mb-2">{task.task_title}</h4>
-                                            {task.assigned_students.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {task.assigned_students.map((student) => (
-                                                        <span
-                                                            key={student.id}
-                                                            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                                                        >
-                                                            {student.student_name} - {student.role}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-gray-500 text-sm">Aucun étudiant assigné</p>
-                                            )}
-                                        </div>
-                                    ))}
+
                                 </div>
                             </div>
 
