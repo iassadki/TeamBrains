@@ -3,15 +3,18 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, ExternalLink, Calendar, Users, CheckCircle, Clock, AlertCircle, Github, Linkedin, User, MapPin } from 'lucide-react';
 
-const UserProfile = () => {
-    const { userId } = useParams();
+const UserProfile = ({ userId: propUserId, isModal = false }) => {
+    const { userId: paramUserId } = useParams();
+    const userId = propUserId || paramUserId;
     const [profileData, setProfileData] = useState(null);
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetchUserProfile();
+        if (userId) {
+            fetchUserProfile();
+        }
     }, [userId]);
 
     const fetchUserProfile = async () => {
@@ -93,9 +96,19 @@ const UserProfile = () => {
         return typeNames[type] || type;
     };
 
-    if (loading) {
+    if (!userId) {
         return (
             <div className="flex justify-center items-center min-h-screen">
+                <div className="text-center">
+                    <div className="text-gray-600 text-xl mb-4">Aucun utilisateur sélectionné</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className={`flex justify-center items-center ${isModal ? 'min-h-96' : 'min-h-screen'}`}>
                 <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-tb"></div>
             </div>
         );
@@ -103,15 +116,17 @@ const UserProfile = () => {
 
     if (error) {
         return (
-            <div className="flex justify-center items-center min-h-screen">
+            <div className={`flex justify-center items-center ${isModal ? 'min-h-96' : 'min-h-screen'}`}>
                 <div className="text-center">
                     <div className="text-red-600 text-xl mb-4">{error}</div>
-                    <button 
-                        onClick={() => window.history.back()}
-                        className="bg-green-tb text-white px-4 py-2 rounded hover:bg-green-600"
-                    >
-                        Retour
-                    </button>
+                    {!isModal && (
+                        <button 
+                            onClick={() => window.history.back()}
+                            className="bg-green-tb text-white px-4 py-2 rounded hover:bg-green-600"
+                        >
+                            Retour
+                        </button>
+                    )}
                 </div>
             </div>
         );
@@ -122,17 +137,19 @@ const UserProfile = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className={isModal ? "bg-gray-50" : "min-h-screen bg-gray-50"}>
+            <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${isModal ? 'py-4' : 'py-8'}`}>
                 <div className="space-y-6">
                     {/* En-tête avec bouton retour */}
                     <div className="flex items-center space-x-4">
-                        <button
-                            onClick={() => window.history.back()}
-                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                            <ArrowLeft className="h-5 w-5" />
-                        </button>
+                        {!isModal && (
+                            <button
+                                onClick={() => window.history.back()}
+                                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <ArrowLeft className="h-5 w-5" />
+                            </button>
+                        )}
                         <div>
                             <h2 className="text-3xl font-bold text-gray-900">
                                 {profileData.prenom} {profileData.nom}

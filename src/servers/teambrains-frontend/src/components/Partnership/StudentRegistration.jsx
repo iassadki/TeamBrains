@@ -518,7 +518,7 @@ const StudentRegistration = () => {
                         
                         <div className="space-y-3">
                             <button
-                                onClick={() => navigate('/dashboard')}
+                                onClick={() => navigate('/projects')}
                                 className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                             >
                                 Accéder au dashboard

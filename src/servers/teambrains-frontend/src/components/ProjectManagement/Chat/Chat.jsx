@@ -108,11 +108,6 @@ const Chat = ({ projectId }) => {
         return format(new Date(timestamp), "d MMMM à HH:mm", { locale: fr });
     };
 
-    // Scroll automatique vers le bas lorsque de nouveaux messages sont ajoutés
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
-
     // Récupération initiale des messages + mise en place du polling
     useEffect(() => {
         if (projectId) {
