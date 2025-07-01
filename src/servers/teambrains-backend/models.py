@@ -47,6 +47,20 @@ class Project(db.Model):
     creator_id = db.Column(db.String(100), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     members = db.relationship('User', secondary='project_members', backref=db.backref('projects', lazy='dynamic'))
     progress = db.Column(db.Integer, nullable=False, default=0, server_default='0')
+    is_public = db.Column(db.Boolean, nullable=False, default=False)  
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'project_slug': self.project_slug,
+            'creation_date': self.creation_date.isoformat(),
+            'status': self.status,
+            'description': self.description,
+            'creator_id': self.creator_id,
+            'progress': self.progress,
+            'is_public': self.is_public
+        }
 
 
 project_members = db.Table('project_members',
@@ -132,6 +146,7 @@ class CVProject(db.Model):
     description = db.Column(db.Text, nullable=True)
     
     project = db.relationship('Project', backref=db.backref('cv_projects', lazy=True))
+    is_visible = db.Column(db.Boolean, nullable=False, default=True)  # Visible par défaut dans le CV
     
     def to_dict(self):
         return {
@@ -143,7 +158,8 @@ class CVProject(db.Model):
             'start_date': self.start_date.isoformat(),
             'end_date': self.end_date.isoformat() if self.end_date else None,
             'team_size': self.team_size,
-            'description': self.description
+            'description': self.description,
+            'is_visible': self.is_visible
         }
     
 class FileDocument(db.Model):
@@ -510,4 +526,31 @@ class UserSkill(db.Model):
             'acquired_date': self.acquired_date.isoformat(),
             'last_updated': self.last_updated.isoformat(),
             'notes': self.notes
+        }
+
+class CVVisibility(db.Model):
+    __tablename__ = 'cv_visibility'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(100), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, unique=True)
+    is_public = db.Column(db.Boolean, nullable=False, default=False)  
+    show_personal_info = db.Column(db.Boolean, nullable=False, default=True)  
+    show_contact_info = db.Column(db.Boolean, nullable=False, default=True)  
+    show_skills = db.Column(db.Boolean, nullable=False, default=True)  
+    show_projects = db.Column(db.Boolean, nullable=False, default=True)  
+    last_updated = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relations
+    user = db.relationship('User', backref=db.backref('cv_visibility', uselist=False, cascade='all, delete-orphan'))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'is_public': self.is_public,
+            'show_personal_info': self.show_personal_info,
+            'show_contact_info': self.show_contact_info,
+            'show_skills': self.show_skills,
+            'show_projects': self.show_projects,
+            'last_updated': self.last_updated.isoformat()
         }

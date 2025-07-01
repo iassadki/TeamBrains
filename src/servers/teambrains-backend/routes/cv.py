@@ -50,14 +50,19 @@ def get_cv_projects():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
     
-    # Récupérer les projets CV existants
-    cv_projects = CVProject.query.filter_by(user_id=user_id).all()
+    include_hidden = request.args.get('include_hidden', 'false').lower() == 'true'
+    
+    query = CVProject.query.filter_by(user_id=user_id)
+    
+    if not include_hidden:
+        query = query.filter_by(is_visible=True)
+    
+    cv_projects = query.all()
     cv_projects_list = []
     
     for cv_project in cv_projects:
         project_dict = cv_project.to_dict()
         
-        # Récupérer les tâches assignées à l'utilisateur pour ce projet
         user_tasks = Task.query.filter_by(
             project_id=cv_project.project_id,
             assignee_id=user_id
@@ -66,35 +71,31 @@ def get_cv_projects():
         project_dict['tasks'] = [task.to_dict() for task in user_tasks]
         cv_projects_list.append(project_dict)
     
-    # Pour les entrepreneurs, ajouter automatiquement leurs projets créés
     if user and user.role == 'businessman':
         created_projects = Project.query.filter_by(creator_id=user_id).all()
         
-        # IDs des projets déjà dans le CV
         existing_project_ids = {cv_proj.project_id for cv_proj in cv_projects}
         
         for project in created_projects:
             if project.id not in existing_project_ids:
-                # Calculer la taille de l'équipe
                 team_size = db.session.query(project_members).filter_by(project_id=project.id).count()
                 
-                # Récupérer les tâches assignées à l'entrepreneur pour ce projet
                 user_tasks = Task.query.filter_by(
                     project_id=project.id,
                     assignee_id=user_id
                 ).all()
                 
-                # Créer l'entrée CV pour le projet créé
                 created_cv_project = {
-                    'id': f"created_{project.id}",  # ID unique pour différencier
+                    'id': f"created_{project.id}",
                     'user_id': user_id,
                     'project_id': project.id,
                     'project_name': project.name,
                     'role': 'Créateur/Entrepreneur',
                     'start_date': project.creation_date.isoformat(),
-                    'end_date': None,  # Projet en cours
+                    'end_date': None,
                     'team_size': team_size,
                     'description': project.description,
+                    'is_visible': True,  
                     'tasks': [task.to_dict() for task in user_tasks]
                 }
                 cv_projects_list.append(created_cv_project)
@@ -102,6 +103,7 @@ def get_cv_projects():
     return jsonify({
         "projects": cv_projects_list
     }), 200
+
 
 @cv_bp.route('/projects/<int:project_id>', methods=['POST'])
 @jwt_required()
