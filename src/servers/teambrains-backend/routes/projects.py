@@ -27,12 +27,17 @@ def create_project():
         status=data['status'],
         description=data['description'],
         creator_id=user_id,
-        project_slug=project_slug
+        project_slug=project_slug,
+        is_public=data.get('is_public', False)  
     )
     db.session.add(new_project)
     db.session.commit()
-    return jsonify({"message": "Projet créé avec succès", "project_id": new_project.id}), 201
-
+    
+    return jsonify({
+        "message": "Projet créé avec succès", 
+        "project_id": new_project.id,
+        "project": new_project.to_dict()
+    }), 201
 @projects.route('/list_projects', methods=['GET'])
 def list_projects():
     all_projects = Project.query.options(joinedload(Project.members)).all()
