@@ -49,7 +49,7 @@ app.register_blueprint(stripe_partnership_bp)
 app.register_blueprint(search_bp, url_prefix='/search')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
-app.config['JWT_SECRET_KEY'] = 'wdgQWWUKwT17lCz1'
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
 app.config['MAIL_SERVER'] = 'mailpit'
 app.config['MAIL_PORT'] = 1025
 app.config['MAIL_USE_TLS'] = False

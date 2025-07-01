@@ -9,7 +9,7 @@ import logging
 import requests
 
 # Configuration Stripe
-stripe.api_key = "sk_test_51RdpQH2VyoUCKFegX9uDXxC87Is60O1zqxaElXo85YLuGiDtOLsKg7npK7hRbPilhOigfJiCNYTXSHEVuURR7WZL00Seczjvex"
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 stripe_bp = Blueprint('stripe', __name__, url_prefix='/api/stripe')
 
@@ -128,7 +128,7 @@ def stripe_webhook():
     
     # Pour les tests en développement, nous désactivons temporairement la vérification de signature
     # Note: En production, utilisez toujours la vérification de signature
-    endpoint_secret = "whsec_test_development"  # Secret pour les tests
+    endpoint_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
     
     try:
         # En mode développement, on parse directement le JSON sans vérification de signature

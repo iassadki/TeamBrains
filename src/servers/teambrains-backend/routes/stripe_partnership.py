@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import logging
 
 # Configuration Stripe
-stripe.api_key = "sk_test_51RdpQH2VyoUCKFegX9uDXxC87Is60O1zqxaElXo85YLuGiDtOLsKg7npK7hRbPilhOigfJiCNYTXSHEVuURR7WZL00Seczjvex"
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 stripe_partnership_bp = Blueprint('stripe_partnership', __name__, url_prefix='/api/partnership/stripe')
 
@@ -120,16 +120,24 @@ def stripe_partnership_webhook():
     payload = request.get_data()
     sig_header = request.headers.get('Stripe-Signature')
     
-    # Endpoint secret pour l'espace partenariat (différent du webhook principal)
-    endpoint_secret = os.getenv('STRIPE_PARTNERSHIP_WEBHOOK_SECRET', 'whsec_test_partnership')
+    # Endpoint secret pour l'espace partenariat
+    endpoint_secret = os.getenv('STRIPE_PARTNERSHIP_WEBHOOK_SECRET')
+    
+    if not endpoint_secret:
+        logging.error("STRIPE_PARTNERSHIP_WEBHOOK_SECRET non configuré")
+        return jsonify({'error': 'Configuration manquante'}), 500
+    
+    if not sig_header:
+        logging.error("Signature Stripe manquante")
+        return jsonify({'error': 'Signature manquante'}), 400
     
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
     except ValueError:
-        logging.error("Payload invalide")
+        logging.error("Payload JSON invalide")
         return jsonify({'error': 'Payload invalide'}), 400
     except stripe.error.SignatureVerificationError:
-        logging.error("Signature invalide")
+        logging.error("Signature webhook invalide")
         return jsonify({'error': 'Signature invalide'}), 400
     
     # Traiter les événements
