@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Filter, X, Edit2, Trash2, User, Calendar, Clock, Paperclip } from 'lucide-react';
+import { Filter, X, Edit2, Trash2, User, Calendar, Clock, Paperclip, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { format, parseISO, isToday, isThisWeek, isPast, isAfter, endOfWeek } from 'date-fns';
@@ -124,6 +124,11 @@ const TaskFilters = ({
             }
         }
 
+        // Filtre par priorité
+        if (filters.priority) {
+            filtered = filtered.filter(task => task.priority === filters.priority);
+        }
+
         // Filtre par statut
         if (filters.status) {
             filtered = filtered.filter(task => {
@@ -173,7 +178,8 @@ const TaskFilters = ({
             assignee: '',
             status: '',
             dueDate: '',
-            sprint: ''
+            sprint: '',
+            priority: ''
         });
     };
 
@@ -212,6 +218,34 @@ const TaskFilters = ({
             return 'En cours';
         } else {
             return 'À faire';
+        }
+    };
+
+    // Obtenir la couleur de la priorité
+    const getPriorityColor = (priority) => {
+        switch (priority) {
+            case 'haute':
+                return 'bg-red-100 text-red-800 border-red-200';
+            case 'moyenne':
+                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'basse':
+                return 'bg-green-100 text-green-800 border-green-200';
+            default:
+                return 'bg-gray-100 text-gray-800 border-gray-200';
+        }
+    };
+
+    // Obtenir l'icône de la priorité
+    const getPriorityIcon = (priority) => {
+        switch (priority) {
+            case 'haute':
+                return '🔥';
+            case 'moyenne':
+                return '➡️';
+            case 'basse':
+                return '🔽';
+            default:
+                return '📋';
         }
     };
 
@@ -269,7 +303,7 @@ const TaskFilters = ({
             </div>
 
             {/* Filtres */}
-            <div className={`${showFilters ? 'block' : 'hidden md:flex'} md:flex md:space-x-4 bg-white rounded-lg p-3 shadow-sm mb-6`}>
+            <div className={`${showFilters ? 'block' : 'hidden md:flex'} md:flex md:flex-wrap md:gap-4 bg-white rounded-lg p-3 shadow-sm mb-6`}>
                 <div className="mb-2 md:mb-0">
                     <label className="block text-xs font-medium text-gray-700 mb-1">Assigné à</label>
                     <select
@@ -300,6 +334,20 @@ const TaskFilters = ({
                                 {sprint}
                             </option>
                         ))}
+                    </select>
+                </div>
+
+                <div className="mb-2 md:mb-0">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Priorité</label>
+                    <select
+                        value={filters.priority}
+                        onChange={(e) => handleFilterChange('priority', e.target.value)}
+                        className="w-full md:w-auto text-sm p-1.5 border border-gray-300 rounded"
+                    >
+                        <option value="">Toutes les priorités</option>
+                        <option value="haute">🔥 Haute</option>
+                        <option value="moyenne">➡️ Moyenne</option>
+                        <option value="basse">🔽 Basse</option>
                     </select>
                 </div>
 
@@ -349,7 +397,7 @@ const TaskFilters = ({
                         <Filter className="mr-2" size={18} />
                         Tâches filtrées ({filteredTasks.length})
                     </h3>
-                    {(filters.assignee || filters.status || filters.dueDate || filters.sprint) && (
+                    {(filters.assignee || filters.status || filters.dueDate || filters.sprint || filters.priority) && (
                         <div className="mt-2 flex flex-wrap gap-2">
                             {filters.assignee && (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -361,6 +409,12 @@ const TaskFilters = ({
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
                                     <Clock size={12} className="mr-1" />
                                     Sprint: {getSprintDisplayName(filters.sprint)}
+                                </span>
+                            )}
+                            {filters.priority && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <AlertTriangle size={12} className="mr-1" />
+                                    Priorité: {getPriorityIcon(filters.priority)} {filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1)}
                                 </span>
                             )}
                             {filters.status && (
@@ -410,6 +464,12 @@ const TaskFilters = ({
                                             <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(task)}`}>
                                                 {getStatusText(task)}
                                             </span>
+                                            {/* Badge de priorité */}
+                                            {task.priority && (
+                                                <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(task.priority)}`}>
+                                                    {getPriorityIcon(task.priority)} {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                                </span>
+                                            )}
                                         </div>
 
                                         {task.description && (

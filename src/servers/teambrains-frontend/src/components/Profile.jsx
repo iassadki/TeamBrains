@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { X, Users, MessageSquare, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { X, Users, MessageSquare, CheckCircle, XCircle, Clock, AlertCircle, Edit, Trash2 } from 'lucide-react';
 
 const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
     const [projectDetails, setProjectDetails] = useState(null);
@@ -10,7 +9,6 @@ const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
     const [feedback, setFeedback] = useState([]);
     const [validationStats, setValidationStats] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [teamMembers, setTeamMembers] = useState([]); // Ilias ajout
 
     useEffect(() => {
         if (isOpen && projectId) {
@@ -36,6 +34,7 @@ const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
                 }
             });
             setFeedback(pendingResponse.data.pending_tasks);
+            setProjectDetails(pendingResponse.data);
 
             // Récupérer les statistiques de validation
             const statsResponse = await axios.get(`http://localhost:5001/validation/stats/${projectId}`, {
@@ -44,7 +43,23 @@ const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
                 }
             });
             setValidationStats(statsResponse.data.stats);
-            setProjectDetails(pendingResponse.data);
+
+            // Récupérer les détails du projet avec les membres
+            const projectResponse = await axios.get(`http://localhost:5001/projects/list_projects`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+
+            // Trouver le projet correspondant dans la liste
+            const currentProject = projectResponse.data.find(p => p.id === projectId);
+            if (currentProject) {
+                setProjectDetails(prev => ({
+                    ...prev,
+                    members: currentProject.members,
+                    project_name: currentProject.name
+                }));
+            }
 
         } catch (error) {
             console.error('Erreur lors de la récupération des détails:', error);
@@ -134,8 +149,33 @@ const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
                                     <h3 className="text-xl font-bold text-gray-800">Composition de l'équipe</h3>
                                 </div>
 
-                                <div className="space-y-4">
-
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {projectDetails?.members && projectDetails.members.length > 0 ? (
+                                        projectDetails.members.map((member) => (
+                                            <div key={member.user_id} className="bg-gray-50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="font-semibold text-gray-800">{member.name}</h4>
+                                                        <p className="text-sm text-gray-600">{member.role}</p>
+                                                    </div>
+                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${member.role === 'BackEnd' ? 'bg-blue-100 text-blue-800' :
+                                                            member.role === 'FrontEnd' ? 'bg-green-100 text-green-800' :
+                                                                member.role === 'FullStack' ? 'bg-purple-100 text-purple-800' :
+                                                                    'bg-orange-100 text-orange-800'
+                                                        }`}>
+                                                        {member.role === 'BackEnd' ? '⚙️' :
+                                                            member.role === 'FrontEnd' ? '🎨' :
+                                                                member.role === 'FullStack' ? '🚀' : '✨'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="col-span-2 text-center py-8">
+                                            <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                                            <p className="text-gray-500">Aucun membre dans l'équipe</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -149,8 +189,8 @@ const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
                                             <div className="flex items-center justify-between mb-3">
                                                 <h4 className="font-semibold text-gray-800">{task.task_title}</h4>
                                                 <span className={`px-2 py-1 text-xs rounded-full ${task.task_completion === 100 ? 'bg-green-100 text-green-800' :
-                                                        task.task_completion > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                                            'bg-gray-100 text-gray-800'
+                                                    task.task_completion > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-gray-100 text-gray-800'
                                                     }`}>
                                                     {task.task_completion}% complété
                                                 </span>
@@ -164,8 +204,8 @@ const ProjectDetailModal = ({ isOpen, onClose, projectId }) => {
                                             <div className="flex gap-2 mb-3">
                                                 {task.task_priority && (
                                                     <span className={`px-2 py-1 text-xs rounded-full ${task.task_priority === 'haute' ? 'bg-red-100 text-red-800' :
-                                                            task.task_priority === 'basse' ? 'bg-blue-100 text-blue-800' :
-                                                                'bg-yellow-100 text-yellow-800'
+                                                        task.task_priority === 'basse' ? 'bg-blue-100 text-blue-800' :
+                                                            'bg-yellow-100 text-yellow-800'
                                                         }`}>
                                                         {task.task_priority === 'haute' ? '🔥' :
                                                             task.task_priority === 'basse' ? '🔽' : '➡️'}
@@ -343,19 +383,31 @@ const Profile = () => {
     });
 
     const [cvProjects, setCvProjects] = useState([]);
+    const [userSkills, setUserSkills] = useState([]);
+    const [availableSkills, setAvailableSkills] = useState([]);
+    const [skillCategories, setSkillCategories] = useState([]);
+    const [showAddSkillModal, setShowAddSkillModal] = useState(false);
+    const [showEditSkillModal, setShowEditSkillModal] = useState(false);
+    const [selectedSkill, setSelectedSkill] = useState(null);
+    const [skillFormData, setSkillFormData] = useState({
+        skill_id: '',
+        level: 'débutant',
+        experience_years: '',
+        self_assessment: '',
+        notes: ''
+    });
     const [originalUserInfo, setOriginalUserInfo] = useState({});
     const [originalCvProfile, setOriginalCvProfile] = useState({});
     const [isEditable, setIsEditable] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [deletePassword, setDeletePassword] = useState('');
     const [selectedProjectId, setSelectedProjectId] = useState(null);
     const [showProjectModal, setShowProjectModal] = useState(false);
-    const { currentUser, logout } = useAuth();
-    const navigate = useNavigate();
+    const { currentUser } = useAuth();
 
     useEffect(() => {
         const fetchData = async () => {
             try {
+                console.log('🔄 Début du chargement des données...');
+
                 // Récupérer les informations utilisateur
                 const userResponse = await axios.get('http://localhost:5001/users/profile', {
                     headers: {
@@ -363,6 +415,7 @@ const Profile = () => {
                         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
                     }
                 });
+                console.log('✅ User data loaded:', userResponse.data);
                 setUserInfo(userResponse.data);
                 setOriginalUserInfo(userResponse.data);
 
@@ -373,6 +426,7 @@ const Profile = () => {
                         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
                     }
                 });
+                console.log('✅ CV profile loaded:', cvProfileResponse.data);
                 setCvProfile(cvProfileResponse.data);
                 setOriginalCvProfile(cvProfileResponse.data);
 
@@ -383,14 +437,213 @@ const Profile = () => {
                         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
                     }
                 });
+                console.log('✅ CV projects loaded:', cvProjectsResponse.data);
                 setCvProjects(cvProjectsResponse.data.projects);
+
+                // Récupérer les compétences de l'utilisateur
+                const userSkillsResponse = await axios.get('http://localhost:5001/skills/user/list', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                });
+                console.log('✅ User skills loaded:', userSkillsResponse.data);
+                setUserSkills(userSkillsResponse.data.user_skills);
+
+                // Récupérer toutes les compétences disponibles
+                console.log('🔍 Tentative de chargement des compétences disponibles...');
+                const availableSkillsResponse = await axios.get('http://localhost:5001/skills/list', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                });
+                console.log('📦 Raw available skills response:', availableSkillsResponse);
+                console.log('📋 Available skills data:', availableSkillsResponse.data);
+
+                const skillsData = availableSkillsResponse.data.skills || availableSkillsResponse.data || [];
+                console.log('🎯 Final skills data to set:', skillsData);
+                setAvailableSkills(skillsData);
+
+                // Récupérer les catégories de compétences
+                const categoriesResponse = await axios.get('http://localhost:5001/skills/categories', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                });
+                console.log('✅ Categories loaded:', categoriesResponse.data);
+                setSkillCategories(categoriesResponse.data.categories);
+
+                console.log('🎉 Toutes les données ont été chargées avec succès !');
+
             } catch (error) {
-                console.error("Erreur lors de la récupération des données", error);
+                console.error("❌ Erreur lors de la récupération des données", error);
+
+                // Log détaillé de l'erreur
+                if (error.response) {
+                    console.error("📄 Response data:", error.response.data);
+                    console.error("📊 Response status:", error.response.status);
+                    console.error("📋 Response headers:", error.response.headers);
+                } else if (error.request) {
+                    console.error("📡 Request error:", error.request);
+                } else {
+                    console.error("⚙️ Setup error:", error.message);
+                }
             }
         };
 
-        fetchData();
+        if (currentUser) {
+            console.log('👤 Current user exists, fetching data...');
+            fetchData();
+        } else {
+            console.log('❌ No current user, skipping data fetch');
+        }
     }, [currentUser]);
+
+    // Fonction pour ouvrir la modale d'ajout de compétence
+    const openAddSkillModal = () => {
+        setSkillFormData({
+            skill_id: '',
+            level: 'débutant',
+            experience_years: '',
+            self_assessment: '',
+            notes: ''
+        });
+        setShowAddSkillModal(true);
+    };
+
+    // Fonction pour gérer les changements dans le formulaire de compétence
+    const handleSkillFormChange = (e) => {
+        const { name, value } = e.target;
+        setSkillFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    // Fonction pour ajouter une nouvelle compétence
+    const handleAddSkill = async (e) => {
+        e.preventDefault();
+
+        try {
+            const response = await axios.post('http://localhost:5001/skills/user/add', skillFormData, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+
+            // Rafraîchir la liste des compétences utilisateur
+            const userSkillsResponse = await axios.get('http://localhost:5001/skills/user/list', {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            setUserSkills(userSkillsResponse.data.user_skills);
+
+            // Fermer la modale et réinitialiser le formulaire
+            setShowAddSkillModal(false);
+            setSkillFormData({
+                skill_id: '',
+                level: 'débutant',
+                experience_years: '',
+                self_assessment: '',
+                notes: ''
+            });
+
+            console.log('Compétence ajoutée avec succès');
+        } catch (error) {
+            console.error('Erreur lors de l\'ajout de la compétence:', error);
+            alert('Erreur lors de l\'ajout de la compétence');
+        }
+    };
+
+    // Fonction pour ouvrir la modale de modification de compétence
+    const openEditSkillModal = (userSkill) => {
+        setSelectedSkill(userSkill);
+        setSkillFormData({
+            skill_id: userSkill.skill_id,
+            level: userSkill.level,
+            experience_years: userSkill.experience_years || '',
+            self_assessment: userSkill.self_assessment || '',
+            notes: userSkill.notes || ''
+        });
+        setShowEditSkillModal(true);
+    };
+
+    // Fonction pour mettre à jour une compétence
+    const handleUpdateSkill = async (e) => {
+        e.preventDefault();
+
+        try {
+            const response = await axios.put(
+                `http://localhost:5001/skills/user/update/${selectedSkill.id}`,
+                skillFormData,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                }
+            );
+
+            // Rafraîchir la liste des compétences utilisateur
+            const userSkillsResponse = await axios.get('http://localhost:5001/skills/user/list', {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            setUserSkills(userSkillsResponse.data.user_skills);
+
+            // Fermer la modale et réinitialiser
+            setShowEditSkillModal(false);
+            setSelectedSkill(null);
+            setSkillFormData({
+                skill_id: '',
+                level: 'débutant',
+                experience_years: '',
+                self_assessment: '',
+                notes: ''
+            });
+
+            console.log('Compétence mise à jour avec succès');
+        } catch (error) {
+            console.error('Erreur lors de la mise à jour de la compétence:', error);
+            alert('Erreur lors de la mise à jour de la compétence');
+        }
+    };
+
+    // Fonction pour supprimer une compétence
+    const handleDeleteSkill = async (userSkillId) => {
+        if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette compétence ?')) {
+            return;
+        }
+
+        try {
+            await axios.delete(`http://localhost:5001/skills/user/remove/${userSkillId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+
+            // Rafraîchir la liste des compétences utilisateur
+            const userSkillsResponse = await axios.get('http://localhost:5001/skills/user/list', {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            setUserSkills(userSkillsResponse.data.user_skills);
+
+            console.log('Compétence supprimée avec succès');
+        } catch (error) {
+            console.error('Erreur lors de la suppression de la compétence:', error);
+            alert('Erreur lors de la suppression de la compétence');
+        }
+    };
 
     const handleEdit = () => {
         setIsEditable(true);
@@ -490,43 +743,41 @@ const Profile = () => {
         setUserInfo({ ...userInfo, technologies: newSelectedTechs });
     };
 
-    const handleDeleteAccount = async () => {
-        if (!deletePassword) {
-            alert('Veuillez entrer votre mot de passe pour confirmer la suppression.');
-            return;
-        }
+    const techsToDisplay = technologies[userInfo.typeDeveloppeur] || [];
 
-        if (!window.confirm('Êtes-vous absolument sûr de vouloir supprimer votre compte ? Cette action est irréversible et toutes vos données seront définitivement supprimées.')) {
-            return;
-        }
-
-        try {
-            const response = await axios.delete('http://localhost:5001/users/delete_account', {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                },
-                data: {
-                    password: deletePassword
-                }
-            });
-
-            if (response.status === 200) {
-                alert(response.data.message || 'Votre compte a été traité avec succès. Vous allez être déconnecté.');
-                logout(); // Déconnecter l'utilisateur
-                navigate('/'); // Rediriger vers la page d'accueil
-            }
-        } catch (error) {
-            if (error.response && error.response.data && error.response.data.message) {
-                alert(`Erreur: ${error.response.data.message}`);
-            } else {
-                alert('Erreur lors de la suppression du compte. Veuillez réessayer.');
-            }
-            console.error("Erreur lors de la suppression du compte", error);
+    // Obtenir la couleur du niveau de compétence
+    const getSkillLevelColor = (level) => {
+        switch (level) {
+            case 'avancé':
+                return 'bg-green-100 text-green-800';
+            case 'intermédiaire':
+                return 'bg-yellow-100 text-yellow-800';
+            case 'débutant':
+                return 'bg-blue-100 text-blue-800';
+            default:
+                return 'bg-gray-100 text-gray-800';
         }
     };
 
-    const techsToDisplay = technologies[userInfo.typeDeveloppeur] || [];
+    // Grouper les compétences par catégorie
+    const groupSkillsByCategory = () => {
+        const grouped = {};
+        userSkills.forEach(userSkill => {
+            const skill = availableSkills.find(s => s.id === userSkill.skill_id);
+            if (skill) {
+                const category = skill.category || 'Autres';
+                if (!grouped[category]) {
+                    grouped[category] = [];
+                }
+                grouped[category].push({
+                    ...userSkill,
+                    skill_name: skill.name,
+                    skill_description: skill.description
+                });
+            }
+        });
+        return grouped;
+    };
 
     return (
         <>
@@ -701,8 +952,8 @@ const Profile = () => {
                                             <span
                                                 key={index}
                                                 className={`px-3 py-1 rounded-full text-sm font-medium cursor-pointer transition-colors ${userInfo.technologies.includes(tech)
-                                                        ? 'bg-green-500 text-white'
-                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                                     } ${isEditable ? 'hover:shadow-md' : 'cursor-default'}`}
                                                 onClick={() => handleSelectTech(tech)}
                                             >
@@ -714,6 +965,106 @@ const Profile = () => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Compétences */}
+                        <div className="bg-gray-50 p-6 rounded-lg">
+                            <h2 className="text-xl font-bold text-gray-800 mb-4">Compétences</h2>
+
+                            {Object.entries(groupSkillsByCategory()).length > 0 ? (
+                                <div className="space-y-4">
+                                    {Object.entries(groupSkillsByCategory()).map(([category, skills]) => (
+                                        <div key={category}>
+                                            <h3 className="text-sm font-semibold text-gray-700 mb-2">{category}</h3>
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                {skills.map((userSkill) => (
+                                                    <div key={userSkill.id} className="group relative">
+                                                        <div className="flex items-center">
+                                                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getSkillLevelColor(userSkill.level)}`}>
+                                                                {userSkill.skill_name}
+                                                            </span>
+
+                                                            {/* Boutons d'action */}
+                                                            <div className="ml-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={() => openEditSkillModal(userSkill)}
+                                                                    className="p-1 text-blue-600 hover:text-blue-800"
+                                                                    title="Modifier"
+                                                                >
+                                                                    <Edit className="w-3 h-3" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteSkill(userSkill.id)}
+                                                                    className="p-1 text-red-600 hover:text-red-800"
+                                                                    title="Supprimer"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Tooltip avec détails */}
+                                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                                                            <div className="bg-gray-800 text-white text-xs rounded py-2 px-3 whitespace-nowrap">
+                                                                <div className="font-semibold">{userSkill.skill_name}</div>
+                                                                <div>Niveau: {userSkill.level}</div>
+                                                                {userSkill.self_assessment && (
+                                                                    <div>Auto-évaluation: {userSkill.self_assessment}/10</div>
+                                                                )}
+                                                                {userSkill.experience_years && (
+                                                                    <div>Expérience: {userSkill.experience_years} ans</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-4">
+                                    <p className="text-gray-500 text-sm">Aucune compétence ajoutée</p>
+                                    <button
+                                        onClick={openAddSkillModal}
+                                        className="mt-2 text-green-600 text-sm hover:text-green-700"
+                                    >
+                                        + Ajouter vos premières compétences
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Bouton d'ajout si des compétences existent déjà */}
+                            {userSkills.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                    <button
+                                        onClick={openAddSkillModal}
+                                        className="w-full py-2 px-4 border border-green-600 text-green-600 rounded-md hover:bg-green-50 text-sm"
+                                    >
+                                        + Ajouter une compétence
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Statistiques rapides */}
+                            {userSkills.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                    <div className="flex justify-between text-xs text-gray-600">
+                                        <span>Total: {userSkills.length} compétences</span>
+                                        <div className="flex space-x-3">
+                                            <span className="text-green-600">
+                                                Avancé: {userSkills.filter(s => s.level === 'avancé').length}
+                                            </span>
+                                            <span className="text-yellow-600">
+                                                Intermédiaire: {userSkills.filter(s => s.level === 'intermédiaire').length}
+                                            </span>
+                                            <span className="text-blue-600">
+                                                Débutant: {userSkills.filter(s => s.level === 'débutant').length}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Colonne de droite */}
@@ -842,107 +1193,6 @@ const Profile = () => {
                         </button>
                     </div>
                 )}
-
-            {/* Zone de danger - Suppression du compte */}
-            {!isEditable && (
-                <div className="mt-12 pt-8 border-t border-red-200">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                        <div className="flex items-start">
-                            <div className="flex-shrink-0">
-                                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.99-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                                </svg>
-                            </div>
-                            <div className="ml-3 flex-1">
-                                <h3 className="text-lg font-medium text-red-800">Zone de danger</h3>
-                                <p className="mt-2 text-sm text-red-700">
-                                    La suppression de votre compte est irréversible. Vos données personnelles et informations 
-                                    de CV seront définitivement supprimées. Si vous participez à des projets collaboratifs, 
-                                    votre profil sera anonymisé pour préserver l'intégrité des projets conformément au RGPD.
-                                </p>
-                                <div className="mt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowDeleteModal(true)}
-                                        className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                                    >
-                                        <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                        Supprimer mon compte
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de confirmation de suppression */}
-            {showDeleteModal && (
-                <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-                            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-                        </div>
-
-                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-                        <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-                            <div className="sm:flex sm:items-start">
-                                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.99-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                                    </svg>
-                                </div>
-                                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                                        Confirmer la suppression du compte
-                                    </h3>
-                                    <div className="mt-2">
-                                        <p className="text-sm text-gray-500">
-                                            Cette action supprimera définitivement vos données personnelles. Si vous participez 
-                                            à des projets, votre profil sera anonymisé. Pour confirmer, veuillez entrer votre mot de passe.
-                                        </p>
-                                        <div className="mt-4">
-                                            <label htmlFor="delete-password" className="block text-sm font-medium text-gray-700">
-                                                Mot de passe
-                                            </label>
-                                            <input
-                                                type="password"
-                                                id="delete-password"
-                                                value={deletePassword}
-                                                onChange={(e) => setDeletePassword(e.target.value)}
-                                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm px-3 py-2"
-                                                placeholder="Entrez votre mot de passe"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteAccount}
-                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
-                                >
-                                    Supprimer définitivement
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowDeleteModal(false);
-                                        setDeletePassword('');
-                                    }}
-                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm"
-                                >
-                                    Annuler
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
             </div>
 
             {/* Modale de détail du projet */}
@@ -951,6 +1201,211 @@ const Profile = () => {
                 onClose={() => setShowProjectModal(false)}
                 projectId={selectedProjectId}
             />
+
+            {/* Modale d'ajout de compétence */}
+            {showAddSkillModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-6 border-b">
+                            <h2 className="text-xl font-bold text-gray-800">Ajouter une compétence</h2>
+                            <button
+                                onClick={() => setShowAddSkillModal(false)}
+                                className="p-2 hover:bg-gray-100 rounded-full"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAddSkill} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Compétence</label>
+                                <select
+                                    name="skill_id"
+                                    value={skillFormData.skill_id}
+                                    onChange={handleSkillFormChange}
+                                    required
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="">Sélectionner une compétence</option>
+                                    {console.log('Available skills in select:', availableSkills)}
+                                    {availableSkills && availableSkills.length > 0 ? (
+                                        availableSkills
+                                            .filter(skill => !userSkills.some(us => us.skill_id === skill.id))
+                                            .map(skill => (
+                                                <option key={skill.id} value={skill.id}>
+                                                    {skill.name} {skill.category && `(${skill.category})`}
+                                                </option>
+                                            ))
+                                    ) : (
+                                        <option disabled>Chargement des compétences...</option>
+                                    )}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Niveau</label>
+                                <select
+                                    name="level"
+                                    value={skillFormData.level}
+                                    onChange={handleSkillFormChange}
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="débutant">🔽 Débutant</option>
+                                    <option value="intermédiaire">➡️ Intermédiaire</option>
+                                    <option value="avancé">🚀 Avancé</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Années d'expérience</label>
+                                <input
+                                    type="number"
+                                    name="experience_years"
+                                    value={skillFormData.experience_years}
+                                    onChange={handleSkillFormChange}
+                                    min="0"
+                                    max="50"
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    placeholder="Ex: 3"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Auto-évaluation (1-10)</label>
+                                <input
+                                    type="number"
+                                    name="self_assessment"
+                                    value={skillFormData.self_assessment}
+                                    onChange={handleSkillFormChange}
+                                    min="1"
+                                    max="10"
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    placeholder="Ex: 7"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                                <textarea
+                                    name="notes"
+                                    value={skillFormData.notes}
+                                    onChange={handleSkillFormChange}
+                                    rows="3"
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    placeholder="Projets réalisés, certifications..."
+                                />
+                            </div>
+
+                            <div className="flex justify-end space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddSkillModal(false)}
+                                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                                >
+                                    Ajouter
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modale de modification de compétence */}
+            {showEditSkillModal && selectedSkill && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-6 border-b">
+                            <h2 className="text-xl font-bold text-gray-800">
+                                Modifier: {availableSkills.find(s => s.id === selectedSkill.skill_id)?.name}
+                            </h2>
+                            <button
+                                onClick={() => setShowEditSkillModal(false)}
+                                className="p-2 hover:bg-gray-100 rounded-full"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleUpdateSkill} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Niveau</label>
+                                <select
+                                    name="level"
+                                    value={skillFormData.level}
+                                    onChange={handleSkillFormChange}
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="débutant">🔽 Débutant</option>
+                                    <option value="intermédiaire">➡️ Intermédiaire</option>
+                                    <option value="avancé">🚀 Avancé</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Années d'expérience</label>
+                                <input
+                                    type="number"
+                                    name="experience_years"
+                                    value={skillFormData.experience_years}
+                                    onChange={handleSkillFormChange}
+                                    min="0"
+                                    max="50"
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    placeholder="Ex: 3"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Auto-évaluation (1-10)</label>
+                                <input
+                                    type="number"
+                                    name="self_assessment"
+                                    value={skillFormData.self_assessment}
+                                    onChange={handleSkillFormChange}
+                                    min="1"
+                                    max="10"
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    placeholder="Ex: 7"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                                <textarea
+                                    name="notes"
+                                    value={skillFormData.notes}
+                                    onChange={handleSkillFormChange}
+                                    rows="3"
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    placeholder="Projets réalisés, certifications..."
+                                />
+                            </div>
+
+                            <div className="flex justify-end space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEditSkillModal(false)}
+                                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                >
+                                    Modifier
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
