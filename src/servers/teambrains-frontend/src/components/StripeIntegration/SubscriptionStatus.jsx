@@ -324,17 +324,16 @@ const SubscriptionStatus = () => {
     };
 
     const handleForceSync = async () => {
-        setLoading(true);
+        setSyncLoading(true);
         setError('');
         
         try {
-            const response = await fetch('http://localhost:5001/api/stripe/test/force-sync', {
+            const response = await fetch('http://localhost:5001/api/stripe/force-sync-all', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({})
+                }
             });
 
             const data = await response.json();
@@ -343,8 +342,14 @@ const SubscriptionStatus = () => {
                 // Recharger les données
                 fetchSubscriptionStatus();
                 setError('');
-                console.log('🧪 Synchronisation forcée réussie:', data);
-                alert(`Sync forcée réussie!\nAncien statut: ${data.old_status}\nNouveau statut: ${data.new_status}\nHas subscription: ${data.has_subscription}`);
+                console.log('🔄 Synchronisation complète réussie:', data);
+                
+                // Afficher un message détaillé
+                if (data.synced_subscriptions.length > 0) {
+                    alert(`✅ Synchronisation réussie!\n\n${data.message}\n\nAbonnements synchronisés : ${data.synced_subscriptions.length}\nEmail : ${data.user_email}\nRôle : ${data.user_role}`);
+                } else {
+                    alert('✅ Synchronisation terminée - Aucun nouvel abonnement trouvé');
+                }
             } else {
                 setError(data.error || 'Erreur lors de la synchronisation forcée');
             }
@@ -352,7 +357,57 @@ const SubscriptionStatus = () => {
             console.error('Erreur:', error);
             setError('Erreur de connexion au serveur');
         } finally {
-            setLoading(false);
+            setSyncLoading(false);
+        }
+    };
+
+    const handleDebugUserSubscriptions = async () => {
+        try {
+            const response = await fetch('http://localhost:5001/api/stripe/debug-user-subscriptions', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Afficher les informations dans une alerte ou console
+                console.log('🔍 Debug abonnements utilisateur:', data);
+                
+                let debugMessage = `🔍 Debug Abonnements Utilisateur\n\n`;
+                debugMessage += `👤 Utilisateur: ${data.user.email} (${data.user.role})\n`;
+                debugMessage += `🏫 École: ${data.user.school_id || 'Aucune'}\n\n`;
+                
+                debugMessage += `📊 Abonnements locaux: ${data.local_subscriptions.length}\n`;
+                data.local_subscriptions.forEach((sub, i) => {
+                    debugMessage += `  ${i+1}. ${sub.plan_type} - ${sub.status} (${sub.stripe_subscription_id})\n`;
+                });
+                
+                debugMessage += `\n💳 Customers Stripe: ${data.stripe_customers.length}\n`;
+                data.stripe_customers.forEach((customer, i) => {
+                    debugMessage += `  ${i+1}. ${customer.email} - ${customer.subscriptions.length} abonnement(s)\n`;
+                    customer.subscriptions.forEach((sub, j) => {
+                        debugMessage += `    ${j+1}. ${sub.status} - ${sub.items[0]?.unit_amount || 0}/100€ (${sub.id})\n`;
+                    });
+                });
+                
+                if (data.school_subscriptions) {
+                    debugMessage += `\n🏫 Abonnements école: ${data.school_subscriptions.length}\n`;
+                }
+                
+                if (data.stripe_error) {
+                    debugMessage += `\n❌ Erreur Stripe: ${data.stripe_error}`;
+                }
+                
+                alert(debugMessage);
+            } else {
+                setError(data.error || 'Erreur lors du debug');
+            }
+        } catch (error) {
+            console.error('Erreur debug utilisateur:', error);
+            setError('Erreur lors du debug utilisateur');
         }
     };
 
@@ -701,10 +756,10 @@ const SubscriptionStatus = () => {
                                     
                                     <button
                                         onClick={handleForceSync}
-                                        disabled={loading}
+                                        disabled={syncLoading}
                                         className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:opacity-50"
                                     >
-                                        {loading ? 'Sync forcée...' : '🧪 Sync forcée (Debug)'}
+                                        {syncLoading ? 'Sync forcée...' : '🧪 Sync forcée (Debug)'}
                                     </button>
                                     
                                     <button
@@ -712,6 +767,13 @@ const SubscriptionStatus = () => {
                                         className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
                                     >
                                         🔍 Diagnostic Stripe
+                                    </button>
+                                    
+                                    <button
+                                        onClick={handleDebugUserSubscriptions}
+                                        className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                                    >
+                                        👤 Debug Abonnements
                                     </button>
                                 </>
                             )}

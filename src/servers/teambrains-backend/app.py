@@ -28,7 +28,16 @@ from routes.visibility import visibility_bp
 
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
+
+# Configuration du logging avec fichier
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
 
 app = Flask(__name__)
 bcrypt.init_app(app)

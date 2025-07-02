@@ -14,7 +14,7 @@ stripe_partnership_bp = Blueprint('stripe_partnership', __name__, url_prefix='/a
 @stripe_partnership_bp.route('/create-school-subscription', methods=['POST'])
 @jwt_required()
 def create_school_subscription():
-    """Créer un abonnement école simplifié - 5€ par étudiant/mois"""
+    """Créer un abonnement école simplifié - 5€ par étudiant/mois - CORRIGÉ"""
     try:
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
@@ -40,7 +40,7 @@ def create_school_subscription():
         # Vérifier qu'il n'y a pas déjà un abonnement actif
         existing_subscription = Subscription.query.filter_by(
             school_id=user.school_id,
-            plan_type='school'
+            plan_type='school_partnership'
         ).first()
         
         if existing_subscription and existing_subscription.status in ['active', 'trialing']:
@@ -59,10 +59,12 @@ def create_school_subscription():
                 email=user.email,
                 name=f"{user.school.name} - {user.prenom} {user.nom}",
                 metadata={
-                    'user_id': user.id,
-                    'school_id': user.school_id,
+                    'user_id': str(user.id),  # CRITIQUE: Toujours en string
+                    'school_id': str(user.school_id),
                     'school_name': user.school.name,
-                    'plan_type': 'school_partnership'
+                    'plan_type': 'school_partnership',
+                    'admin_email': user.email,  # Ajout pour sécurité
+                    'student_count': str(student_count)
                 }
             )
         
@@ -94,13 +96,17 @@ def create_school_subscription():
             success_url=f"http://localhost:5173/partenariat-ecole/dashboard?success=true&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"http://localhost:5173/partenariat-ecole/abonnement?canceled=true",
             metadata={
-                'user_id': user.id,
+                'user_id': str(user.id),  # CRITIQUE: Toujours en string
                 'school_id': str(user.school_id),
                 'plan_type': 'school_partnership',
                 'student_count': str(student_count),
-                'monthly_amount': str(monthly_amount)
+                'monthly_amount': str(monthly_amount),
+                'user_email': user.email,  # Ajout pour sécurité
+                'school_name': user.school.name
             }
         )
+        
+        logging.info(f"🎯 SCHOOL SESSION CREATED: {checkout_session.id} for school {user.school_id} by user {user.id} ({user.email})")
         
         return jsonify({
             'checkout_url': checkout_session.url,
@@ -115,16 +121,23 @@ def create_school_subscription():
         
     except Exception as e:
         logging.error(f"Erreur création abonnement école partenariat: {str(e)}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': 'Erreur lors de la création de l\'abonnement'}), 500
 
 @stripe_partnership_bp.route('/webhook', methods=['POST'])
 def stripe_partnership_webhook():
-    """Webhook Stripe pour l'espace partenariat écoles"""
+    """Webhook Stripe pour l'espace partenariat écoles - CORRIGÉ"""
     payload = request.get_data()
     sig_header = request.headers.get('Stripe-Signature')
     
     # Endpoint secret pour l'espace partenariat
     endpoint_secret = os.getenv('STRIPE_PARTNERSHIP_WEBHOOK_SECRET')
+    
+    # Mode Docker/développement avec secret fixe
+    if not endpoint_secret:
+        endpoint_secret = 'whsec_partnership_dev_fixed_secret_456'
+        logging.info("🐋 Utilisation du secret webhook partenariat Docker fixe")
     
     if not endpoint_secret:
         logging.error("STRIPE_PARTNERSHIP_WEBHOOK_SECRET non configuré")
@@ -136,6 +149,7 @@ def stripe_partnership_webhook():
     
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        logging.info(f"🎯 PARTNERSHIP WEBHOOK: {event['type']}")
     except ValueError:
         logging.error("Payload JSON invalide")
         return jsonify({'error': 'Payload invalide'}), 400
@@ -144,85 +158,179 @@ def stripe_partnership_webhook():
         return jsonify({'error': 'Signature invalide'}), 400
     
     # Traiter les événements
-    if event['type'] == 'checkout.session.completed':
-        handle_partnership_checkout_completed(event['data']['object'])
-    elif event['type'] == 'invoice.payment_succeeded':
-        handle_partnership_payment_succeeded(event['data']['object'])
-    elif event['type'] == 'invoice.payment_failed':
-        handle_partnership_payment_failed(event['data']['object'])
-    elif event['type'] == 'customer.subscription.updated':
-        handle_partnership_subscription_updated(event['data']['object'])
-    elif event['type'] == 'customer.subscription.deleted':
-        handle_partnership_subscription_deleted(event['data']['object'])
-    
-    return jsonify({'status': 'success'}), 200
+    try:
+        if event['type'] == 'checkout.session.completed':
+            handle_partnership_checkout_completed(event['data']['object'])
+        elif event['type'] == 'invoice.payment_succeeded':
+            handle_partnership_payment_succeeded(event['data']['object'])
+        elif event['type'] == 'invoice.payment_failed':
+            handle_partnership_payment_failed(event['data']['object'])
+        elif event['type'] == 'customer.subscription.updated':
+            handle_partnership_subscription_updated(event['data']['object'])
+        elif event['type'] == 'customer.subscription.deleted':
+            handle_partnership_subscription_deleted(event['data']['object'])
+        else:
+            logging.info(f"ℹ️ PARTNERSHIP WEBHOOK IGNORED: {event['type']}")
+        
+        logging.info(f"✅ PARTNERSHIP WEBHOOK COMPLETED: {event['type']}")
+        return jsonify({'status': 'success'}), 200
+        
+    except Exception as e:
+        logging.error(f"❌ PARTNERSHIP WEBHOOK ERROR: {event['type']} failed - {str(e)}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': str(e)}), 200
 
 def handle_partnership_checkout_completed(session):
-    """Traiter la completion d'une session de checkout partenariat"""
+    """Traiter la completion d'une session de checkout partenariat - CORRIGÉ"""
     try:
-        logging.info(f"Session partenariat reçue: {session}")
+        logging.info(f"✅ PARTNERSHIP WEBHOOK: Session checkout completed - ID: {session.get('id')}")
+        logging.info(f"📋 Session metadata: {session.get('metadata', {})}")
+        logging.info(f"👤 Customer ID: {session.get('customer')}")
         
-        # Vérifier les métadonnées
-        if not session.get('metadata') or not session['metadata'].get('user_id'):
-            logging.warning("Session sans métadonnées user_id")
+        # NOUVELLE APPROCHE: Recherche multi-critères pour identifier l'utilisateur et l'école
+        user_id = None
+        user = None
+        school_id = None
+        
+        # 1. Essayer avec les métadonnées directes
+        if session.get('metadata') and session['metadata'].get('user_id'):
+            try:
+                user_id = int(session['metadata']['user_id'])
+                user = User.query.get(user_id)
+                if user:
+                    logging.info(f"✅ Utilisateur trouvé via métadonnées: {user.id} ({user.email})")
+                    school_id = int(session['metadata'].get('school_id', 0)) or user.school_id
+                else:
+                    logging.warning(f"⚠️ User ID {user_id} des métadonnées non trouvé en base")
+            except (ValueError, TypeError):
+                logging.error(f"❌ User/School ID invalide dans métadonnées")
+                user_id = None
+        
+        # 2. Si pas trouvé, rechercher par customer email
+        if not user:
+            customer_id = session.get('customer')
+            if customer_id:
+                try:
+                    customer = stripe.Customer.retrieve(customer_id)
+                    customer_email = customer.email
+                    
+                    # Rechercher l'utilisateur par email
+                    user = User.query.filter_by(email=customer_email).first()
+                    if user:
+                        user_id = user.id
+                        school_id = user.school_id
+                        logging.info(f"✅ Utilisateur trouvé via customer email: {user.id} ({user.email})")
+                    else:
+                        logging.error(f"❌ Aucun utilisateur trouvé pour email: {customer_email}")
+                        return
+                        
+                except stripe.error.StripeError as e:
+                    logging.error(f"❌ Erreur récupération customer {customer_id}: {str(e)}")
+                    return
+            else:
+                logging.error("❌ Pas de customer_id disponible")
+                return
+        
+        # 3. Si toujours pas trouvé, essayer par abonnement existant
+        if not user:
+            existing_subscription = Subscription.query.filter_by(stripe_customer_id=session.get('customer')).first()
+            if existing_subscription:
+                user = User.query.get(existing_subscription.user_id)
+                if user:
+                    user_id = user.id
+                    school_id = existing_subscription.school_id or user.school_id
+                    logging.info(f"✅ Utilisateur trouvé via abonnement existant: {user.id} ({user.email})")
+        
+        if not user or not user_id or not school_id:
+            logging.error("❌ IMPOSSIBLE DE TROUVER L'UTILISATEUR/ÉCOLE - Session abandonnée")
             return
         
-        user_id = session['metadata']['user_id']
-        school_id = int(session['metadata']['school_id'])
-        student_count = int(session['metadata']['student_count'])
-        monthly_amount = int(session['metadata']['monthly_amount'])
+        # Récupérer les métadonnées
+        metadata = session.get('metadata', {})
+        student_count = int(metadata.get('student_count', 1))
+        monthly_amount = int(metadata.get('monthly_amount', student_count * 500))
         
-        # Récupérer la subscription Stripe
+        # Vérifier si la session a une subscription
         if not session.get('subscription'):
-            logging.warning("Session sans subscription ID")
+            logging.warning("⚠️ Session sans subscription ID")
             return
         
         stripe_subscription = stripe.Subscription.retrieve(session['subscription'])
+        logging.info(f"📊 Stripe subscription: {stripe_subscription.id}, status: {stripe_subscription.status}")
         
-        # Créer ou mettre à jour l'abonnement en base
-        subscription = Subscription.query.filter_by(school_id=school_id).first()
-        if not subscription:
+        # Vérifier si l'abonnement existe déjà par stripe_subscription_id (gestion des doublons)
+        subscription = Subscription.query.filter_by(
+            stripe_subscription_id=stripe_subscription.id
+        ).first()
+        
+        if subscription:
+            # Abonnement existe déjà, on met à jour
+            logging.info(f"🔄 Abonnement Stripe existant détecté: {stripe_subscription.id}, mise à jour")
+            action = "mis à jour"
+            
+            # Mettre à jour les informations
+            subscription.user_id = user_id
+            subscription.school_id = school_id
+            subscription.status = stripe_subscription.status
+            subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+            subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+            subscription.current_student_count = student_count
+            subscription.total_monthly_amount = monthly_amount
+            subscription.last_student_count_update = datetime.utcnow()
+        else:
+            # Créer un nouvel abonnement
+            logging.info(f"➕ Création nouvel abonnement partenariat pour école {school_id}")
+            action = "créé"
+            
             subscription = Subscription()
+            subscription.user_id = user_id
+            subscription.school_id = school_id
+            subscription.stripe_subscription_id = stripe_subscription.id
+            subscription.stripe_customer_id = session['customer']
+            subscription.plan_type = 'school_partnership'
+            subscription.status = stripe_subscription.status
+            subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+            subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+            
+            # Paramètres spécifiques au plan partenariat
+            subscription.current_student_count = student_count
+            subscription.student_price_per_month = 500  # 5€ en centimes
+            subscription.total_monthly_amount = monthly_amount
+            subscription.last_student_count_update = datetime.utcnow()
+            
+            db.session.add(subscription)
         
-        subscription.user_id = user_id
-        subscription.school_id = school_id
-        subscription.stripe_subscription_id = stripe_subscription.id
-        subscription.stripe_customer_id = session['customer']
-        subscription.plan_type = 'school_partnership'
-        subscription.status = stripe_subscription.status
-        subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
-        subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
-        
-        # Paramètres spécifiques au plan partenariat
-        subscription.current_student_count = student_count
-        subscription.student_price_per_month = 500  # 5€ en centimes
-        subscription.total_monthly_amount = monthly_amount
-        subscription.last_student_count_update = datetime.utcnow()
-        
-        db.session.add(subscription)
         db.session.commit()
         
-        logging.info(f"Abonnement partenariat créé pour l'école {school_id} avec {student_count} étudiants")
+        logging.info(f"✅ PARTNERSHIP WEBHOOK SUCCESS: Abonnement partenariat {action} pour l'école {school_id} avec {student_count} étudiants par user {user_id} ({user.email})")
         
     except Exception as e:
-        logging.error(f"Erreur traitement checkout partenariat: {str(e)}")
+        db.session.rollback()
+        logging.error(f"❌ PARTNERSHIP WEBHOOK ERROR - Checkout session: {str(e)}")
+        logging.error(f"Session data: {session}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
 
 def handle_partnership_payment_succeeded(invoice):
     """Traiter le paiement réussi d'une facture partenariat"""
     try:
-        logging.info(f"Paiement partenariat réussi: {invoice['id']}")
+        logging.info(f"💰 PARTNERSHIP WEBHOOK: Invoice payment succeeded - ID: {invoice['id']}")
         
         # Réinitialiser les compteurs d'échec si nécessaire
         if invoice.get('subscription'):
             subscription = Subscription.query.filter_by(
-                stripe_subscription_id=invoice['subscription']
+                stripe_subscription_id=invoice['subscription'],
+                plan_type='school_partnership'
             ).first()
             
             if subscription:
                 subscription.payment_failed_count = 0
                 subscription.last_payment_failed_at = None
                 subscription.payment_method_action_required = False
+                subscription.unpaid_invoice_id = None
                 db.session.commit()
+                logging.info(f"✅ Paiement réussi pour école {subscription.school_id}")
                 
     except Exception as e:
         logging.error(f"Erreur traitement paiement partenariat réussi: {str(e)}")
@@ -230,17 +338,24 @@ def handle_partnership_payment_succeeded(invoice):
 def handle_partnership_payment_failed(invoice):
     """Traiter l'échec de paiement d'une facture partenariat"""
     try:
-        logging.warning(f"Échec paiement partenariat: {invoice['id']}")
+        logging.warning(f"❌ PARTNERSHIP WEBHOOK: Échec paiement - Invoice: {invoice['id']}")
         
         if invoice.get('subscription'):
             subscription = Subscription.query.filter_by(
-                stripe_subscription_id=invoice['subscription']
+                stripe_subscription_id=invoice['subscription'],
+                plan_type='school_partnership'
             ).first()
             
             if subscription:
                 subscription.payment_failed_count = (subscription.payment_failed_count or 0) + 1
                 subscription.last_payment_failed_at = datetime.utcnow()
                 subscription.unpaid_invoice_id = invoice['id']
+                
+                # Suspendre après 3 échecs
+                if subscription.payment_failed_count >= 3:
+                    subscription.status = 'past_due'
+                    logging.warning(f"⚠️ École {subscription.school_id} suspendue après 3 échecs")
+                
                 db.session.commit()
                 
     except Exception as e:
@@ -249,15 +364,21 @@ def handle_partnership_payment_failed(invoice):
 def handle_partnership_subscription_updated(stripe_subscription):
     """Traiter la mise à jour d'un abonnement partenariat"""
     try:
+        logging.info(f"🔄 PARTNERSHIP WEBHOOK: Subscription updated - ID: {stripe_subscription['id']}")
+        
         subscription = Subscription.query.filter_by(
-            stripe_subscription_id=stripe_subscription['id']
+            stripe_subscription_id=stripe_subscription['id'],
+            plan_type='school_partnership'
         ).first()
         
         if subscription:
+            old_status = subscription.status
             subscription.status = stripe_subscription['status']
             subscription.current_period_start = datetime.fromtimestamp(stripe_subscription['current_period_start'])
             subscription.current_period_end = datetime.fromtimestamp(stripe_subscription['current_period_end'])
             db.session.commit()
+            
+            logging.info(f"✅ École {subscription.school_id}: {old_status} → {stripe_subscription['status']}")
             
     except Exception as e:
         logging.error(f"Erreur mise à jour abonnement partenariat: {str(e)}")
@@ -265,16 +386,167 @@ def handle_partnership_subscription_updated(stripe_subscription):
 def handle_partnership_subscription_deleted(stripe_subscription):
     """Traiter la suppression d'un abonnement partenariat"""
     try:
+        logging.info(f"🚫 PARTNERSHIP WEBHOOK: Subscription deleted - ID: {stripe_subscription['id']}")
+        
         subscription = Subscription.query.filter_by(
-            stripe_subscription_id=stripe_subscription['id']
+            stripe_subscription_id=stripe_subscription['id'],
+            plan_type='school_partnership'
         ).first()
         
         if subscription:
+            old_status = subscription.status
             subscription.status = 'canceled'
+            subscription.payment_failed_count = 0
+            subscription.payment_method_action_required = False
+            subscription.unpaid_invoice_id = None
             db.session.commit()
+            
+            logging.info(f"✅ École {subscription.school_id} annulée: {old_status} → canceled")
             
     except Exception as e:
         logging.error(f"Erreur suppression abonnement partenariat: {str(e)}")
+
+@stripe_partnership_bp.route('/test/sync-subscription', methods=['POST'])
+@jwt_required()
+def sync_subscription_from_stripe():
+    """Synchroniser un abonnement depuis Stripe (pour debug) - CORRIGÉ"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user or user.role != 'school_admin':
+            return jsonify({'error': 'Accès non autorisé'}), 403
+        
+        data = request.get_json()
+        session_id = data.get('session_id')
+        
+        if not session_id:
+            return jsonify({'error': 'session_id requis'}), 400
+        
+        # Récupérer la session depuis Stripe
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+            logging.info(f"🔍 Session récupérée: {session.id}")
+        except stripe.error.StripeError as e:
+            return jsonify({'error': f'Session Stripe non trouvée: {str(e)}'}), 404
+        
+        # Traiter manuellement la session comme si le webhook avait été appelé
+        handle_partnership_checkout_completed(session)
+        
+        return jsonify({
+            'message': 'Synchronisation effectuée avec succès',
+            'session_id': session_id,
+            'subscription_id': session.get('subscription'),
+            'customer_id': session.get('customer'),
+            'metadata': session.get('metadata', {})
+        }), 200
+        
+    except Exception as e:
+        logging.error(f"Erreur sync abonnement: {str(e)}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'error': 'Erreur lors de la synchronisation'}), 500
+
+@stripe_partnership_bp.route('/force-sync-all', methods=['POST'])
+@jwt_required()
+def force_sync_all_partnership_subscriptions():
+    """Force la synchronisation de TOUS les abonnements pour une école"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user or user.role != 'school_admin' or not user.school_id:
+            return jsonify({'error': 'Accès non autorisé'}), 403
+        
+        synced_subscriptions = []
+        
+        # 1. Recherche par email dans Stripe
+        stripe_customers = stripe.Customer.list(email=user.email, limit=10)
+        
+        for customer in stripe_customers.data:
+            # Pour chaque customer, récupérer ses abonnements
+            customer_subscriptions = stripe.Subscription.list(customer=customer.id, limit=10)
+            
+            for stripe_sub in customer_subscriptions.data:
+                # Créer ou mettre à jour l'abonnement local
+                local_sub = Subscription.query.filter_by(
+                    stripe_subscription_id=stripe_sub.id
+                ).first()
+                
+                if not local_sub:
+                    # Créer un nouvel abonnement
+                    local_sub = Subscription()
+                    local_sub.user_id = user.id
+                    local_sub.school_id = user.school_id
+                    local_sub.stripe_subscription_id = stripe_sub.id
+                    local_sub.stripe_customer_id = customer.id
+                    local_sub.plan_type = 'school_partnership'
+                    
+                    # Calculer le student_count basé sur le montant
+                    if stripe_sub.items and stripe_sub.items.data:
+                        amount = stripe_sub.items.data[0].price.unit_amount
+                        estimated_students = amount // 500  # 5€ = 500 centimes
+                        local_sub.current_student_count = max(1, estimated_students)
+                        local_sub.student_price_per_month = 500
+                        local_sub.total_monthly_amount = amount
+                
+                # Mettre à jour le statut depuis Stripe
+                local_sub.status = stripe_sub.status
+                local_sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start)
+                local_sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end)
+                
+                db.session.add(local_sub)
+                synced_subscriptions.append({
+                    'subscription_id': stripe_sub.id,
+                    'status': stripe_sub.status,
+                    'plan_type': local_sub.plan_type,
+                    'customer_email': customer.email,
+                    'student_count': local_sub.current_student_count
+                })
+        
+        # 2. Recherche par abonnements existants de l'école
+        existing_subscriptions = Subscription.query.filter_by(school_id=user.school_id).all()
+        for local_sub in existing_subscriptions:
+            try:
+                stripe_sub = stripe.Subscription.retrieve(local_sub.stripe_subscription_id)
+                if stripe_sub:
+                    old_status = local_sub.status
+                    local_sub.status = stripe_sub.status
+                    local_sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start)
+                    local_sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end)
+                    
+                    if old_status != stripe_sub.status:
+                        synced_subscriptions.append({
+                            'subscription_id': stripe_sub.id,
+                            'old_status': old_status,
+                            'new_status': stripe_sub.status,
+                            'action': 'updated'
+                        })
+            except stripe.error.StripeError:
+                local_sub.status = 'canceled'
+                synced_subscriptions.append({
+                    'subscription_id': local_sub.stripe_subscription_id,
+                    'action': 'marked_as_canceled'
+                })
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'{len(synced_subscriptions)} abonnements synchronisés pour l\'école {user.school.name}',
+            'synced_subscriptions': synced_subscriptions,
+            'school_info': {
+                'id': user.school_id,
+                'name': user.school.name,
+                'admin_email': user.email
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erreur sync forcé partenariat: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Erreur lors de la synchronisation: {str(e)}'}), 500
 
 @stripe_partnership_bp.route('/subscription/update-student-count', methods=['POST'])
 @jwt_required()
@@ -409,42 +681,6 @@ def get_partnership_subscription_status():
     except Exception as e:
         logging.error(f"Erreur récupération statut abonnement partenariat: {str(e)}")
         return jsonify({'error': 'Erreur lors de la récupération du statut'}), 500
-
-@stripe_partnership_bp.route('/test/sync-subscription', methods=['POST'])
-@jwt_required()
-def sync_subscription_from_stripe():
-    """Synchroniser un abonnement depuis Stripe (pour debug)"""
-    try:
-        user_id = get_jwt_identity()
-        user = User.query.get(user_id)
-        
-        if not user or user.role != 'school_admin':
-            return jsonify({'error': 'Accès non autorisé'}), 403
-        
-        data = request.get_json()
-        session_id = data.get('session_id')
-        
-        if not session_id:
-            return jsonify({'error': 'session_id requis'}), 400
-        
-        # Récupérer la session depuis Stripe
-        try:
-            session = stripe.checkout.Session.retrieve(session_id)
-        except stripe.error.StripeError as e:
-            return jsonify({'error': f'Session Stripe non trouvée: {str(e)}'}), 404
-        
-        # Traiter manuellement la session comme si le webhook avait été appelé
-        handle_partnership_checkout_completed(session)
-        
-        return jsonify({
-            'message': 'Synchronisation effectuée',
-            'session_id': session_id,
-            'subscription_id': session.get('subscription')
-        }), 200
-        
-    except Exception as e:
-        logging.error(f"Erreur sync abonnement: {str(e)}")
-        return jsonify({'error': 'Erreur lors de la synchronisation'}), 500
 
 @stripe_partnership_bp.route('/setup-billing-portal', methods=['POST'])
 @jwt_required()

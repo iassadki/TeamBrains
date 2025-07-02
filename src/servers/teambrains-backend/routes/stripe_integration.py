@@ -22,7 +22,7 @@ STRIPE_PRICES = {
 @stripe_bp.route('/create-checkout-session', methods=['POST'])
 @jwt_required()
 def create_checkout_session():
-    """Créer une session de paiement Stripe Checkout"""
+    """Créer une session de paiement Stripe Checkout - MAINTENANT ÉCOLE SEULEMENT"""
     try:
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
@@ -31,12 +31,12 @@ def create_checkout_session():
             return jsonify({'error': 'Utilisateur non trouvé'}), 404
         
         data = request.get_json()
-        plan_type = data.get('plan_type')  # 'student' ou 'school'
+        plan_type = data.get('plan_type')  # 'school' seulement maintenant
         school_id = data.get('school_id')  # Pour les abonnements école (optionnel)
         student_count = data.get('student_count', 0)  # Nombre d'étudiants pour le plan école
         
-        if plan_type not in ['student', 'school']:
-            return jsonify({'error': 'Type de plan invalide'}), 400
+        if plan_type not in ['school']:
+            return jsonify({'error': 'Type de plan invalide - Seuls les plans école sont supportés'}), 400
         
         # Pour les plans école, valider le nombre d'étudiants
         if plan_type == 'school' and student_count < 1:
@@ -54,31 +54,31 @@ def create_checkout_session():
         # Vérifier si l'utilisateur a déjà un abonnement avec customer_id
         existing_subscription = Subscription.query.filter_by(user_id=user.id).first()
         if existing_subscription and existing_subscription.stripe_customer_id:
-            stripe_customer = stripe.Customer.retrieve(existing_subscription.stripe_customer_id)
-        else:
+            try:
+                stripe_customer = stripe.Customer.retrieve(existing_subscription.stripe_customer_id)
+            except stripe.error.StripeError:
+                stripe_customer = None
+        
+        if not stripe_customer:
             stripe_customer = stripe.Customer.create(
                 email=user.email,
                 name=f"{user.prenom} {user.nom}",
                 metadata={
-                    'user_id': user.id,
-                    'role': user.role
+                    'user_id': str(user.id),  # IMPORTANT: Convertir en string
+                    'role': user.role,
+                    'plan_type': plan_type,
+                    'school_id': str(school_id) if school_id else '',
+                    'student_count': str(student_count)
                 }
             )
+
+        # Plan école hybride : base + étudiants
+        base_amount = 12000  # 120€ de base par an
+        student_amount = 200 * student_count * 12  # 2€ par étudiant par mois, pour 1 an
+        total_yearly_amount = base_amount + student_amount
         
-        # Calculer le prix selon le type de plan
-        if plan_type == 'school':
-            # Plan école hybride : base + étudiants
-            base_amount = 12000  # 120€ de base par an
-            student_amount = 200 * student_count * 12  # 2€ par étudiant par mois, pour 1 an
-            total_yearly_amount = base_amount + student_amount
-            
-            product_description = f'Plan École Hybride : 120€/an + {student_count} étudiants × 24€/an = {total_yearly_amount/100}€/an'
-            logging.info(f"Prix calculé pour école: base={base_amount}, étudiants={student_count}, montant_étudiants={student_amount}, total={total_yearly_amount}")
-        else:
-            # Plan étudiant classique
-            total_yearly_amount = 200  # 2€/mois pour étudiant
-            student_count = 0
-            product_description = f'Abonnement TeamBrains Étudiant - 2€/mois'
+        product_description = f'Plan École Hybride : 120€/an + {student_count} étudiants × 24€/an = {total_yearly_amount/100}€/an'
+        logging.info(f"Prix calculé pour école: base={base_amount}, étudiants={student_count}, montant_étudiants={student_amount}, total={total_yearly_amount}")
         
         # Créer la session Checkout
         checkout_session = stripe.checkout.Session.create(
@@ -89,12 +89,12 @@ def create_checkout_session():
                 'price_data': {
                     'currency': 'eur',
                     'product_data': {
-                        'name': f'TeamBrains - Plan {plan_type.title()}{"" if plan_type == "student" else " (Hybride)"}',
+                        'name': f'TeamBrains - Plan École (Hybride)',
                         'description': product_description
                     },
                     'unit_amount': total_yearly_amount,
                     'recurring': {
-                        'interval': 'month' if plan_type == 'student' else 'year'
+                        'interval': 'year'
                     }
                 },
                 'quantity': 1,
@@ -102,12 +102,16 @@ def create_checkout_session():
             success_url="http://localhost:5173/dashboard/subscription?success=true&session_id={CHECKOUT_SESSION_ID}",
             cancel_url="http://localhost:5173/tarifs?canceled=true",
             metadata={
-                'user_id': user.id,
+                'user_id': str(user.id),  # CRITIQUE: Toujours en string
                 'plan_type': plan_type,
                 'school_id': str(school_id) if school_id else '',
-                'student_count': str(student_count) if plan_type == 'school' else '0'
+                'student_count': str(student_count),
+                'user_email': user.email,  # Ajout pour plus de sécurité
+                'user_name': f"{user.prenom} {user.nom}"
             }
         )
+        
+        logging.info(f"🎯 SESSION CREATED: {checkout_session.id} for user {user.id} ({user.email})")
         
         return jsonify({
             'checkout_url': checkout_session.url,
@@ -122,22 +126,28 @@ def create_checkout_session():
 
 @stripe_bp.route('/webhook', methods=['POST'])
 def stripe_webhook():
-    """Webhook pour recevoir les événements Stripe"""
+    """Webhook pour recevoir les événements Stripe - CORRIGÉ"""
     payload = request.get_data()
     sig_header = request.headers.get('Stripe-Signature')
     
-    # Pour les tests en développement, nous désactivons temporairement la vérification de signature
-    # Note: En production, utilisez toujours la vérification de signature
+    # Configuration webhook secret
     endpoint_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
     
+    # Mode Docker/développement avec secret fixe
+    if not endpoint_secret:
+        endpoint_secret = 'whsec_teambrains_dev_fixed_secret_123'
+        logging.info("🐋 Utilisation du secret webhook Docker fixe")
+    
     try:
-        # En mode développement, on parse directement le JSON sans vérification de signature
-        if request.headers.get('User-Agent', '').startswith('Stripe/'):
+        # Mode développement : on peut parser directement le JSON
+        if (os.environ.get('FLASK_ENV') == 'development' and 
+            request.headers.get('User-Agent', '').startswith('Stripe/')):
             event = json.loads(payload.decode('utf-8'))
-            logging.info(f"Événement Stripe reçu: {event.get('type')}")
+            logging.info(f"🧪 DEV MODE: Événement Stripe reçu: {event.get('type')}")
         else:
-            # Tentative de vérification normale pour la production
+            # Vérification de signature normale
             event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+            logging.info(f"✅ VERIFIED: Événement Stripe reçu: {event.get('type')}")
     except ValueError as e:
         logging.error(f"Payload invalide: {str(e)}")
         return jsonify({'error': 'Payload invalide'}), 400
@@ -178,53 +188,110 @@ def stripe_webhook():
         return jsonify({'status': 'error', 'message': str(e)}), 200
 
 def handle_checkout_session_completed(session):
-    """Traiter la completion d'une session de checkout"""
+    """Traiter la completion d'une session de checkout - CORRIGÉ"""
     try:
         logging.info(f"✅ WEBHOOK: Session checkout completed reçue - ID: {session.get('id')}")
+        logging.info(f"📋 Session metadata: {session.get('metadata', {})}")
+        logging.info(f"👤 Customer ID: {session.get('customer')}")
         
-        # Vérifier si les métadonnées existent (vraie session vs test)
-        if not session.get('metadata') or not session['metadata'].get('user_id'):
-            logging.warning("⚠️ Session sans métadonnées user_id - recherche alternative par customer_id")
-            
-            # Essayer de retrouver l'utilisateur par customer_id
+        # NOUVELLE APPROCHE: Recherche multi-critères pour identifier l'utilisateur
+        user_id = None
+        user = None
+        
+        # 1. Essayer avec les métadonnées directes
+        if session.get('metadata') and session['metadata'].get('user_id'):
+            user_id = session['metadata']['user_id']
+            try:
+                user_id = int(user_id)
+                user = User.query.get(user_id)
+                if user:
+                    logging.info(f"✅ Utilisateur trouvé via métadonnées: {user.id} ({user.email})")
+                else:
+                    logging.warning(f"⚠️ User ID {user_id} des métadonnées non trouvé en base")
+            except (ValueError, TypeError):
+                logging.error(f"❌ User ID invalide dans métadonnées: {user_id}")
+                user_id = None
+        
+        # 2. Si pas trouvé, rechercher par customer email
+        if not user:
             customer_id = session.get('customer')
             if customer_id:
-                subscription = Subscription.query.filter_by(stripe_customer_id=customer_id).first()
-                if subscription:
-                    logging.info(f"🔍 Utilisateur retrouvé via customer_id: {subscription.user_id}")
-                    session['metadata'] = {'user_id': subscription.user_id}
-                else:
-                    logging.error(f"❌ Aucun abonnement trouvé pour customer_id: {customer_id}")
+                try:
+                    customer = stripe.Customer.retrieve(customer_id)
+                    customer_email = customer.email
+                    
+                    # Rechercher l'utilisateur par email
+                    user = User.query.filter_by(email=customer_email).first()
+                    if user:
+                        user_id = user.id
+                        logging.info(f"✅ Utilisateur trouvé via customer email: {user.id} ({user.email})")
+                    else:
+                        logging.error(f"❌ Aucun utilisateur trouvé pour email: {customer_email}")
+                        return
+                        
+                except stripe.error.StripeError as e:
+                    logging.error(f"❌ Erreur récupération customer {customer_id}: {str(e)}")
                     return
             else:
-                logging.error("❌ Pas de customer_id disponible non plus")
+                logging.error("❌ Pas de customer_id disponible")
                 return
         
-        user_id = session['metadata']['user_id']
-        plan_type = session['metadata']['plan_type']
-        school_id = session['metadata'].get('school_id')
-        student_count = session['metadata'].get('student_count')
+        # 3. Si toujours pas trouvé, essayer par abonnement existant
+        if not user:
+            existing_subscription = Subscription.query.filter_by(stripe_customer_id=session.get('customer')).first()
+            if existing_subscription:
+                user = User.query.get(existing_subscription.user_id)
+                if user:
+                    user_id = user.id
+                    logging.info(f"✅ Utilisateur trouvé via abonnement existant: {user.id} ({user.email})")
+        
+        if not user or not user_id:
+            logging.error("❌ IMPOSSIBLE DE TROUVER L'UTILISATEUR - Session abandonnée")
+            return
+        
+        # Récupérer les métadonnées ou les déduire
+        metadata = session.get('metadata', {})
+        plan_type = metadata.get('plan_type', 'school')  # Par défaut école maintenant
+        school_id = metadata.get('school_id')
+        student_count = metadata.get('student_count', '0')
         
         # Vérifier si la session a une subscription
         if not session.get('subscription'):
-            logging.warning("Session sans subscription ID")
+            logging.warning("⚠️ Session sans subscription ID")
             return
         
         # Récupérer la subscription Stripe
         stripe_subscription = stripe.Subscription.retrieve(session['subscription'])
+        logging.info(f"📊 Stripe subscription: {stripe_subscription.id}, status: {stripe_subscription.status}")
         
-        # Créer ou mettre à jour l'abonnement en base
-        subscription = Subscription.query.filter_by(user_id=user_id).first()
-        if not subscription:
+        # Vérifier si l'abonnement existe déjà par stripe_subscription_id (gestion des doublons)
+        subscription = Subscription.query.filter_by(
+            stripe_subscription_id=stripe_subscription.id
+        ).first()
+        
+        if subscription:
+            # Abonnement existe déjà, on met à jour
+            logging.info(f"🔄 Abonnement Stripe existant détecté: {stripe_subscription.id}, mise à jour")
+            action = "mis à jour"
+            
+            # Mettre à jour les informations
+            subscription.user_id = user_id
+            subscription.status = stripe_subscription.status
+            subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+            subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+        else:
+            # Créer un nouvel abonnement
+            logging.info(f"➕ Création nouvel abonnement pour user {user_id}")
+            action = "créé"
+            
             subscription = Subscription()
             subscription.user_id = user_id
-        
-        subscription.stripe_subscription_id = stripe_subscription.id
-        subscription.stripe_customer_id = session['customer']
-        subscription.plan_type = plan_type
-        subscription.status = stripe_subscription.status
-        subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
-        subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+            subscription.stripe_subscription_id = stripe_subscription.id
+            subscription.stripe_customer_id = session['customer']
+            subscription.plan_type = plan_type
+            subscription.status = stripe_subscription.status
+            subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+            subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
         
         # Pour les abonnements école, ajouter les informations hybrides
         if plan_type == 'school':
@@ -242,16 +309,22 @@ def handle_checkout_session_completed(session):
             base_monthly = subscription.base_plan_amount // 12  # 10€ par mois
             student_monthly = (subscription.current_student_count or 0) * subscription.student_price_per_month
             subscription.total_monthly_amount = base_monthly + student_monthly
+            
+            logging.info(f"🏫 École configurée: {subscription.current_student_count} étudiants, {subscription.total_monthly_amount/100}€/mois")
         
-        db.session.add(subscription)
+        if action == "créé":
+            db.session.add(subscription)
+        
         db.session.commit()
         
-        logging.info(f"✅ WEBHOOK SUCCESS: Abonnement créé/mis à jour pour l'utilisateur {user_id} - Plan: {plan_type}")
+        logging.info(f"✅ WEBHOOK SUCCESS: Abonnement {action} pour l'utilisateur {user_id} ({user.email}) - Plan: {plan_type}")
         
     except Exception as e:
         db.session.rollback()
         logging.error(f"❌ WEBHOOK ERROR - Checkout session: {str(e)}")
         logging.error(f"Session data: {session}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
 
 def handle_invoice_payment_succeeded(invoice):
     """Traiter le paiement réussi d'une facture"""
@@ -734,7 +807,7 @@ def enable_webhook(webhook_id):
             
     except Exception as e:
         logging.error(f"Erreur activation webhook: {str(e)}")
-        return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500
+        return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500 
 
 # ===============================
 # NOUVELLES ROUTES FACTURATION HYBRIDE ÉCOLES
@@ -1302,3 +1375,211 @@ def quick_sync_subscription():
     except Exception as e:
         logging.error(f"❌ Erreur quick sync: {str(e)}")
         return jsonify({'error': 'Erreur lors de la vérification rapide'}), 500
+
+@stripe_bp.route('/force-sync-all', methods=['POST'])
+@jwt_required()
+def force_sync_all_subscriptions():
+    """Force la synchronisation de TOUS les abonnements pour un utilisateur"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Utilisateur non trouvé'}), 404
+        
+        synced_subscriptions = []
+        
+        # 1. Recherche par customer email dans Stripe
+        stripe_customers = stripe.Customer.list(email=user.email, limit=10)
+        
+        for customer in stripe_customers.data:
+            # Pour chaque customer, récupérer ses abonnements
+            customer_subscriptions = stripe.Subscription.list(customer=customer.id, limit=10)
+            
+            for stripe_sub in customer_subscriptions.data:
+                # Créer ou mettre à jour l'abonnement local
+                local_sub = Subscription.query.filter_by(
+                    stripe_subscription_id=stripe_sub.id
+                ).first()
+                
+                if not local_sub:
+                    # Créer un nouvel abonnement
+                    local_sub = Subscription()
+                    local_sub.user_id = user.id
+                    local_sub.stripe_subscription_id = stripe_sub.id
+                    local_sub.stripe_customer_id = customer.id
+                    
+                    # Déterminer le type de plan basé sur les métadonnées du customer ou de la subscription
+                    plan_type = 'student'  # par défaut
+                    if customer.metadata.get('plan_type'):
+                        plan_type = customer.metadata['plan_type']
+                    elif customer.metadata.get('school_id'):
+                        plan_type = 'school_partnership'
+                    
+                    local_sub.plan_type = plan_type
+                    
+                    # Si c'est un plan école, ajouter les infos école
+                    if plan_type in ['school_partnership', 'school'] and customer.metadata.get('school_id'):
+                        try:
+                            local_sub.school_id = int(customer.metadata['school_id'])
+                        except (ValueError, TypeError):
+                            pass
+                
+                # Mettre à jour le statut depuis Stripe
+                local_sub.status = stripe_sub.status
+                local_sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start)
+                local_sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end)
+                
+                # Pour les plans école, essayer de récupérer le student_count
+                if local_sub.plan_type in ['school_partnership', 'school']:
+                    # Récupérer le montant de l'abonnement pour calculer le nombre d'étudiants
+                    if stripe_sub.items and stripe_sub.items.data:
+                        amount = stripe_sub.items.data[0].price.unit_amount
+                        if local_sub.plan_type == 'school_partnership':
+                            # 5€ par étudiant/mois = 500 centimes
+                            estimated_students = amount // 500
+                            local_sub.current_student_count = max(1, estimated_students)
+                            local_sub.student_price_per_month = 500
+                            local_sub.total_monthly_amount = amount
+                        elif local_sub.plan_type == 'school':
+                            # Plan hybride plus complexe
+                            local_sub.base_plan_amount = 12000  # 120€/an
+                            local_sub.student_price_per_month = 200  # 2€/mois
+                
+                db.session.add(local_sub)
+                synced_subscriptions.append({
+                    'subscription_id': stripe_sub.id,
+                    'status': stripe_sub.status,
+                    'plan_type': local_sub.plan_type,
+                    'customer_email': customer.email
+                })
+        
+        # 2. Recherche par abonnements existants en base
+        existing_subscriptions = Subscription.query.filter_by(user_id=user.id).all()
+        for local_sub in existing_subscriptions:
+            try:
+                stripe_sub = stripe.Subscription.retrieve(local_sub.stripe_subscription_id)
+                if stripe_sub:
+                    # Mettre à jour depuis Stripe
+                    old_status = local_sub.status
+                    local_sub.status = stripe_sub.status
+                    local_sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start)
+                    local_sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end)
+                    
+                    if old_status != stripe_sub.status:
+                        synced_subscriptions.append({
+                            'subscription_id': stripe_sub.id,
+                            'old_status': old_status,
+                            'new_status': stripe_sub.status,
+                            'action': 'updated'
+                        })
+            except stripe.error.StripeError:
+                # L'abonnement n'existe plus sur Stripe
+                local_sub.status = 'canceled'
+                synced_subscriptions.append({
+                    'subscription_id': local_sub.stripe_subscription_id,
+                    'action': 'marked_as_canceled'
+                })
+        
+        # 3. Si l'utilisateur est admin école, rechercher aussi par school_id
+        if user.role == 'school_admin' and user.school_id:
+            school_subscriptions = Subscription.query.filter_by(school_id=user.school_id).all()
+            for school_sub in school_subscriptions:
+                if school_sub.user_id != user.id:  # Éviter les doublons
+                    try:
+                        stripe_sub = stripe.Subscription.retrieve(school_sub.stripe_subscription_id)
+                        school_sub.status = stripe_sub.status
+                        school_sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start)
+                        school_sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end)
+                        synced_subscriptions.append({
+                            'subscription_id': stripe_sub.id,
+                            'action': 'school_subscription_synced'
+                        })
+                    except stripe.error.StripeError:
+                        school_sub.status = 'canceled'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'{len(synced_subscriptions)} abonnements synchronisés',
+            'synced_subscriptions': synced_subscriptions,
+            'user_email': user.email,
+            'user_role': user.role
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erreur sync forcé: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Erreur lors de la synchronisation: {str(e)}'}), 500
+
+@stripe_bp.route('/debug-user-subscriptions', methods=['GET'])
+@jwt_required()
+def debug_user_subscriptions():
+    """Debug: Voir tous les abonnements liés à un utilisateur"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Utilisateur non trouvé'}), 404
+        
+        debug_info = {
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'role': user.role,
+                'school_id': user.school_id
+            },
+            'local_subscriptions': [],
+            'stripe_customers': [],
+            'stripe_subscriptions': []
+        }
+        
+        # Abonnements locaux
+        local_subs = Subscription.query.filter_by(user_id=user.id).all()
+        for sub in local_subs:
+            debug_info['local_subscriptions'].append(sub.to_dict())
+        
+        # Si école, abonnements de l'école
+        if user.school_id:
+            school_subs = Subscription.query.filter_by(school_id=user.school_id).all()
+            debug_info['school_subscriptions'] = [sub.to_dict() for sub in school_subs]
+        
+        # Customers Stripe par email
+        try:
+            stripe_customers = stripe.Customer.list(email=user.email, limit=10)
+            for customer in stripe_customers.data:
+                customer_info = {
+                    'id': customer.id,
+                    'email': customer.email,
+                    'metadata': customer.metadata,
+                    'subscriptions': []
+                }
+                
+                # Abonnements de ce customer
+                customer_subscriptions = stripe.Subscription.list(customer=customer.id, limit=10)
+                for stripe_sub in customer_subscriptions.data:
+                    customer_info['subscriptions'].append({
+                        'id': stripe_sub.id,
+                        'status': stripe_sub.status,
+                        'current_period_start': datetime.fromtimestamp(stripe_sub.current_period_start).isoformat(),
+                        'current_period_end': datetime.fromtimestamp(stripe_sub.current_period_end).isoformat(),
+                        'items': [{
+                            'price_id': item.price.id,
+                            'unit_amount': item.price.unit_amount,
+                            'currency': item.price.currency,
+                            'interval': item.price.recurring.interval if item.price.recurring else None
+                        } for item in stripe_sub.items.data]
+                    })
+                
+                debug_info['stripe_customers'].append(customer_info)
+        except stripe.error.StripeError as e:
+            debug_info['stripe_error'] = str(e)
+        
+        return jsonify(debug_info), 200
+        
+    except Exception as e:
+        logging.error(f"Erreur debug: {str(e)}")
+        return jsonify({'error': str(e)}), 500

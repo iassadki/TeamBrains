@@ -74,16 +74,16 @@ const SignUp = () => {
                     role: formData.role,
                     typeDeveloppeur: formData.typeDeveloppeur,
                     technologies: formData.technologies
-                }
-            })
-            .then(function (response) {
+            }
+        })
+        .then(function (response) {
                 localStorage.setItem('accessToken', response.data.accessToken);
                 window.location.href = '/';
-            })
-            .catch(function (error) {
-                console.error(error);
+        })
+        .catch(function (error) {
+            console.error(error);
                 alert("Une erreur est survenue lors de l'inscription.");
-            });
+        });
         }
     };
     

@@ -94,13 +94,7 @@ const NavBar = () => {
                     }>
                         Contact
                     </NavLink>
-                    <NavLink to="/tarifs" className={({ isActive }) =>
-                        isActive
-                            ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
-                            : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
-                    }>
-                        Tarifs
-                    </NavLink>
+
                     {currentUser ? (
                         <div ref={dropdownRef} className="relative">
                             <button
@@ -222,17 +216,7 @@ const NavBar = () => {
                         >
                             Contact
                         </NavLink>
-                        <NavLink
-                            to="/tarifs"
-                            className={({ isActive }) =>
-                                isActive
-                                    ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
-                                    : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
-                            }
-                            onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                            Tarifs
-                        </NavLink>
+
                         {currentUser ? (
                             <>
                                 <NavLink
