@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, ExternalLink, Calendar, Users, CheckCircle, Clock, AlertCircle, Github, Linkedin, User, MapPin } from 'lucide-react';
 
-const UserProfile = ({ userId: propUserId, isModal = false }) => {
+const UserProfile = ({ userId: propUserId, isModal = false, isSchoolView = false }) => {
     const { userId: paramUserId } = useParams();
     const userId = propUserId || paramUserId;
     const [profileData, setProfileData] = useState(null);
@@ -21,24 +21,38 @@ const UserProfile = ({ userId: propUserId, isModal = false }) => {
         try {
             setLoading(true);
             
+            // Déterminer quels endpoints et token utiliser
+            const token = isSchoolView 
+                ? localStorage.getItem('partnershipToken')
+                : localStorage.getItem('accessToken');
+            
+            const profileEndpoint = isSchoolView
+                ? `http://localhost:5001/api/partnership/school/student/${userId}/profile`
+                : `http://localhost:5001/users/profile/${userId}`;
+            
+            const projectsEndpoint = isSchoolView
+                ? `http://localhost:5001/api/partnership/school/student/${userId}/cv-projects`
+                : `http://localhost:5001/cv/projects/user/${userId}`;
+            
             // Récupérer le profil utilisateur
-            const userResponse = await axios.get(`http://localhost:5001/users/profile/${userId}`, {
+            const userResponse = await axios.get(profileEndpoint, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+                    'Authorization': `Bearer ${token}`,
                 },
             });
             setProfileData(userResponse.data);
 
             // Récupérer les projets CV de l'utilisateur
             try {
-                const projectsResponse = await axios.get(`http://localhost:5001/cv/projects/user/${userId}`, {
+                const projectsResponse = await axios.get(projectsEndpoint, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+                        'Authorization': `Bearer ${token}`,
                     },
                 });
                 setProjects(projectsResponse.data.projects || []);
             } catch (projectError) {
                 // Si pas de projets ou erreur, on continue avec un tableau vide
+                console.log('Pas de projets trouvés:', projectError);
                 setProjects([]);
             }
 

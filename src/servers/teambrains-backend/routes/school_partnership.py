@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, School, SchoolRegistrationToken, Subscription
+from models import db, User, School, SchoolRegistrationToken, Subscription, CVProject, Task, Project, project_members
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from datetime import datetime, timedelta
 from extensions import bcrypt
@@ -386,6 +386,16 @@ def register_student_with_token():
         if not data.get('password'):
             return jsonify({"error": "Mot de passe requis pour les comptes existants"}), 400
         
+        # Vérifier que le typeDeveloppeur est fourni si l'utilisateur n'en a pas
+        if not existing_user.typeDeveloppeur and not data.get('typeDeveloppeur'):
+            return jsonify({"error": "Vous devez définir votre type de développeur pour rejoindre une école"}), 400
+        
+        # Validation du typeDeveloppeur si fourni
+        if data.get('typeDeveloppeur'):
+            valid_types = ['FrontEnd', 'BackEnd', 'FullStack', 'Designer']
+            if data['typeDeveloppeur'] not in valid_types:
+                return jsonify({"error": f"Type de développeur invalide. Valeurs autorisées: {', '.join(valid_types)}"}), 400
+        
         # Vérification exactement comme dans auth.py
         logging.info(f"Tentative de liaison pour {existing_user.email}")
         logging.info(f"Hash du mot de passe (premiers caractères): {existing_user.password[:50]}...")
@@ -444,10 +454,16 @@ def register_student_with_token():
     
     else:
         # Nouvel utilisateur - vérifier les champs requis
-        required_new_fields = ['nom', 'prenom', 'password']
+        required_new_fields = ['nom', 'prenom', 'password', 'typeDeveloppeur']
         for field in required_new_fields:
             if field not in data:
-                return jsonify({"error": f"Le champ {field} est requis pour un nouveau compte"}), 400
+                field_name = "type de développeur" if field == 'typeDeveloppeur' else field
+                return jsonify({"error": f"Le champ {field_name} est requis pour un nouveau compte"}), 400
+        
+        # Validation supplémentaire pour typeDeveloppeur
+        valid_types = ['FrontEnd', 'BackEnd', 'FullStack', 'Designer']
+        if data['typeDeveloppeur'] not in valid_types:
+            return jsonify({"error": f"Type de développeur invalide. Valeurs autorisées: {', '.join(valid_types)}"}), 400
     
         try:
             # Créer l'étudiant
@@ -605,4 +621,122 @@ def get_school_stats():
         
     except Exception as e:
         logging.error(f"Erreur lors de la récupération des statistiques: {str(e)}")
-        return jsonify({"error": "Erreur lors de la récupération des statistiques"}), 500 
+        return jsonify({"error": "Erreur lors de la récupération des statistiques"}), 500
+
+@school_partnership_bp.route('/school/student/<string:student_id>/profile', methods=['GET'])
+@jwt_required()
+def get_student_profile(student_id):
+    """Récupérer le profil d'un étudiant pour l'école"""
+    try:
+        current_user_id = get_jwt_identity()
+        admin_user = User.query.get(current_user_id)
+        
+        if not admin_user or admin_user.role != 'school_admin' or not admin_user.school_id:
+            return jsonify({"error": "Accès non autorisé"}), 403
+        
+        school = School.query.get(admin_user.school_id)
+        if not school:
+            return jsonify({"error": "École non trouvée"}), 404
+        
+        # Vérifier que l'étudiant appartient à cette école
+        student = User.query.filter_by(id=student_id, school_id=school.id, role='student').first()
+        if not student:
+            return jsonify({"error": "Étudiant non trouvé ou n'appartient pas à cette école"}), 404
+        
+        profile_data = {
+            "id": student.id,
+            "prenom": student.prenom,
+            "nom": student.nom,
+            "role": student.role,
+            "email": student.email,  # L'école peut voir l'email de ses étudiants
+            "typeDeveloppeur": student.typeDeveloppeur,
+            "technologies": student.technologies.split(',') if student.technologies else [],
+            "etudes": student.etudes,
+            "ambitions": student.ambitions,
+            "linkedin_url": student.linkedin_url,
+            "portfolio_url": student.portfolio_url,
+            "github_url": student.github_url,
+            "school": {
+                "id": school.id,
+                "name": school.name
+            }
+        }
+        
+        return jsonify(profile_data), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@school_partnership_bp.route('/school/student/<string:student_id>/cv-projects', methods=['GET'])
+@jwt_required()
+def get_student_cv_projects(student_id):
+    """Récupérer les projets CV d'un étudiant pour l'école"""
+    try:
+        current_user_id = get_jwt_identity()
+        admin_user = User.query.get(current_user_id)
+        
+        if not admin_user or admin_user.role != 'school_admin' or not admin_user.school_id:
+            return jsonify({"error": "Accès non autorisé"}), 403
+        
+        school = School.query.get(admin_user.school_id)
+        if not school:
+            return jsonify({"error": "École non trouvée"}), 404
+        
+        # Vérifier que l'étudiant appartient à cette école
+        student = User.query.filter_by(id=student_id, school_id=school.id, role='student').first()
+        if not student:
+            return jsonify({"error": "Étudiant non trouvé ou n'appartient pas à cette école"}), 404
+        
+        # Récupérer les projets CV
+        cv_projects = CVProject.query.filter_by(user_id=student_id).all()
+        cv_projects_list = []
+        
+        for cv_project in cv_projects:
+            project_dict = cv_project.to_dict()
+            
+            # Récupérer les tâches assignées à l'étudiant pour ce projet
+            user_tasks = Task.query.filter_by(
+                project_id=cv_project.project_id,
+                assignee_id=student_id
+            ).all()
+            
+            project_dict['tasks'] = [task.to_dict() for task in user_tasks]
+            cv_projects_list.append(project_dict)
+        
+        # Pour les entrepreneurs, ajouter automatiquement leurs projets créés
+        if student.role == 'businessman':
+            created_projects = Project.query.filter_by(creator_id=student_id).all()
+            
+            # IDs des projets déjà dans le CV
+            existing_project_ids = {cv_proj.project_id for cv_proj in cv_projects}
+            
+            for project in created_projects:
+                if project.id not in existing_project_ids:
+                    # Calculer la taille de l'équipe
+                    team_size = db.session.query(project_members).filter_by(project_id=project.id).count()
+                    
+                    # Récupérer les tâches assignées à l'entrepreneur pour ce projet
+                    user_tasks = Task.query.filter_by(
+                        project_id=project.id,
+                        assignee_id=student_id
+                    ).all()
+                    
+                    # Créer l'entrée CV pour le projet créé
+                    created_cv_project = {
+                        'id': f"created_{project.id}",
+                        'user_id': student_id,
+                        'project_id': project.id,
+                        'project_name': project.name,
+                        'role': 'Créateur/Entrepreneur',
+                        'start_date': project.creation_date.isoformat(),
+                        'end_date': None,
+                        'team_size': team_size,
+                        'description': project.description,
+                        'tasks': [task.to_dict() for task in user_tasks]
+                    }
+                    cv_projects_list.append(created_cv_project)
+        
+        return jsonify({"projects": cv_projects_list}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500 

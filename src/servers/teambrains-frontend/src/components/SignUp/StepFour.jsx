@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const StepFour = ({ prevStep, handleChange, values, submitForm }) => {
+const StepFour = ({ prevStep, handleChange, values, submitForm, schoolData }) => {
     const technologies = {
       FrontEnd: ["HTML", "CSS", "JavaScript", "React", "Vue"],
       BackEnd: ["Node.js", "Python", "Java", "PHP", "Ruby", "MongoDB", "SQL"],
@@ -38,6 +38,12 @@ const StepFour = ({ prevStep, handleChange, values, submitForm }) => {
         <div className="w-full max-w-xl">
           <div className="bg-white border border-gray-200 shadow-md rounded px-8 pt-6 pb-8 mb-4">
             <h3 className="mb-6"><span className="text-xl font-bold">Quelles sont vos skills ?</span><span className='ml-2 rounded p-1 bg-gray-200 text-xs'>ÉTAPE 3/3</span></h3>
+            
+            {schoolData && schoolData.school && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">🎓 École : {schoolData.school.name}</p>
+              </div>
+            )}
             
             {error && (
               <div className="mb-4 text-red-500 font-medium text-center">

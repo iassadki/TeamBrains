@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import NavBar from './components/NavBar';
 import HeaderSection from './components/HeaderSection';
@@ -9,6 +9,7 @@ import SignIn from './components/SignIn';
 import Profile from './components/Profile';
 import UserProfile from './components/UserProfile';
 import { AuthProvider } from './context/AuthContext';
+import { ModalProvider, useModal } from './context/ModalContext';
 import PrivateRoute from './components/PrivateRoute';
 import Projects from './components/Projects';
 import CreateProject from './components/CreateProject';
@@ -27,44 +28,26 @@ import SchoolLogin from './components/Partnership/SchoolLogin';
 import PartnershipSchoolDashboard from './components/Partnership/SchoolDashboard';
 import StudentRegistration from './components/Partnership/StudentRegistration';
 
-const App = () => {
-    // États pour gérer les modaux
-    const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
-    const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
-
-    // Fonctions pour gérer les modaux
-    const openSignInModal = () => {
-        setIsSignUpModalOpen(false);
-        setIsSignInModalOpen(true);
-    };
-
-    const openSignUpModal = () => {
-        setIsSignInModalOpen(false);
-        setIsSignUpModalOpen(true);
-    };
-
-    const closeModals = () => {
-        setIsSignInModalOpen(false);
-        setIsSignUpModalOpen(false);
-    };
+const AppContent = () => {
+    const {
+        isSignInModalOpen,
+        isSignUpModalOpen,
+        openSignInModal,
+        openSignUpModal,
+        closeModals
+    } = useModal();
 
     return (
         <Router>
             <AuthProvider>
                 <div className="flex flex-col min-h-screen">
-                    <NavBar 
-                        isSignInModalOpen={isSignInModalOpen}
-                        isSignUpModalOpen={isSignUpModalOpen}
-                        openSignInModal={openSignInModal}
-                        openSignUpModal={openSignUpModal}
-                        closeModals={closeModals}
-                    />
+                    <NavBar />
                     <main className="flex-grow mt-[5rem]" style={{ minHeight: `calc(100vh - 80px)` }}>
                         <Routes>
                             <Route path="/" element={
                                 <div>
                                     <HeaderSection />
-                                    <HomeContent openSignUpModal={openSignUpModal} />
+                                    <HomeContent />
                                 </div>
                             } />
                             <Route path="/inscription" element={<SignUp />} />
@@ -111,6 +94,14 @@ const App = () => {
                 </Modal>
             </AuthProvider>
         </Router>
+    );
+};
+
+const App = () => {
+    return (
+        <ModalProvider>
+            <AppContent />
+        </ModalProvider>
     );
 };
 

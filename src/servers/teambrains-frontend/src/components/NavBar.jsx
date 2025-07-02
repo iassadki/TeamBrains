@@ -3,14 +3,12 @@ import { NavLink } from 'react-router-dom';
 import logo from "../assets/logo_teambrains.svg";
 import { CircleUserRound, Menu, X, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import { useNavigate } from 'react-router-dom';
 import GlobalSearch from './GlobalSearch';
 
-const NavBar = ({ 
-    openSignInModal, 
-    openSignUpModal, 
-    closeModals 
-}) => {
+const NavBar = () => {
+    const { openSignInModal, openSignUpModal, closeModals } = useModal();
     // États pour gérer les différents éléments interactifs
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

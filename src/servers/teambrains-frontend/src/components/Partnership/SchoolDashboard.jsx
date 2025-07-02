@@ -1183,7 +1183,7 @@ const SchoolDashboard = () => {
 
                         {/* Contenu du modal */}
                         <div className="flex-1 overflow-y-auto">
-                            <UserProfile userId={selectedStudentId} isModal={true} />
+                            <UserProfile userId={selectedStudentId} isModal={true} isSchoolView={true} />
                         </div>
                     </div>
                 </div>

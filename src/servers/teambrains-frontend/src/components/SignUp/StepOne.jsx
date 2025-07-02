@@ -6,6 +6,9 @@ const StepOne = ({ nextStep, handleChange, values }) => {
 
     const [error, setError] = useState('');
 
+    // Vérifier si on vient d'une inscription école
+    const schoolData = JSON.parse(localStorage.getItem('schoolRegistrationData') || 'null');
+    
     const handleNextStep = () => {
         if (!values.role) {
             setError('Veuillez sélectionner un type avant de continuer.');
@@ -15,9 +18,24 @@ const StepOne = ({ nextStep, handleChange, values }) => {
         }
     };
 
+    // Si on vient d'une école, passer automatiquement à la suite
+    React.useEffect(() => {
+        if (schoolData && schoolData.isFromSchool && values.role === 'student') {
+            nextStep();
+        }
+    }, [values.role, schoolData]);
+
     return (
         <div className="flex justify-center py-14">
             <div className="text-center">
+                {schoolData && schoolData.school && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-md mx-auto">
+                        <h4 className="font-medium text-blue-900">🎓 Inscription via école partenaire</h4>
+                        <p className="text-sm text-blue-700">École : {schoolData.school.name}</p>
+                        <p className="text-xs text-blue-600 mt-1">Redirection automatique vers l'inscription étudiant...</p>
+                    </div>
+                )}
+                
                 <h3 className="text-xl mb-8">Quel type de personne êtes-vous ?</h3>
 
                 <div className="flex flex-col md:flex-row justify-center gap-4">

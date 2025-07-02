@@ -10,9 +10,19 @@ const SignUp = () => {
     const [formData, setFormData] = useState({
         role: '',
     });
+    const [schoolData, setSchoolData] = useState(null);
 
     useEffect(() => {
         window.scrollTo(0, 0);
+        
+        // Vérifier si on vient d'une inscription via école
+        const savedSchoolData = localStorage.getItem('schoolRegistrationData');
+        if (savedSchoolData) {
+            const schoolInfo = JSON.parse(savedSchoolData);
+            setSchoolData(schoolInfo);
+            setFormData(prev => ({ ...prev, role: 'student' }));
+            setStep(2); // Aller directement à StepTwo
+        }
       }, []);
 
     const nextStep = () => {
@@ -30,27 +40,51 @@ const SignUp = () => {
       
 
       const submitForm = () => {
-        axios.post('http://localhost:5001/auth/signup', { // Utilisez le bon endpoint ici
-            data: { // Assurez-vous d'encapsuler vos données dans un objet `data` comme attendu par votre backend
+        // Si on vient d'une école, utiliser l'endpoint de liaison école
+        if (schoolData && schoolData.isFromSchool) {
+            const payload = {
+                token: schoolData.token,
                 nom: formData.nom,
                 prenom: formData.prenom,
                 email: formData.email,
                 password: formData.password,
-                role: formData.role,
                 typeDeveloppeur: formData.typeDeveloppeur,
                 technologies: formData.technologies
-                // Ajoutez d'autres champs si nécessaire, comme `typeDeveloppeur` et `technologies`
-            }
-        })
-        .then(function (response) {
-            localStorage.setItem('accessToken', response.data.accessToken); // Stockez l'accessToken
-            
-            window.location.href = '/'; // Redirection
-        })
-        .catch(function (error) {
-            console.error(error);
-            setErrorMessage("Une erreur est survenue lors de l'inscription."); // Vous devriez définir `setErrorMessage` dans votre composant si ce n'est pas déjà fait
-        });
+            };
+
+            axios.post('http://localhost:5001/api/partnership/student/register', payload)
+                .then(function (response) {
+                    localStorage.setItem('accessToken', response.data.access_token);
+                    // Nettoyer les données temporaires
+                    localStorage.removeItem('schoolRegistrationData');
+                    window.location.href = '/';
+                })
+                .catch(function (error) {
+                    console.error(error);
+                    alert(error.response?.data?.error || "Une erreur est survenue lors de l'inscription.");
+                });
+        } else {
+            // Inscription normale
+            axios.post('http://localhost:5001/auth/signup', {
+                data: {
+                    nom: formData.nom,
+                    prenom: formData.prenom,
+                    email: formData.email,
+                    password: formData.password,
+                    role: formData.role,
+                    typeDeveloppeur: formData.typeDeveloppeur,
+                    technologies: formData.technologies
+                }
+            })
+            .then(function (response) {
+                localStorage.setItem('accessToken', response.data.accessToken);
+                window.location.href = '/';
+            })
+            .catch(function (error) {
+                console.error(error);
+                alert("Une erreur est survenue lors de l'inscription.");
+            });
+        }
     };
     
     
@@ -59,11 +93,11 @@ const SignUp = () => {
         case 1:
             return <StepOne nextStep={nextStep} handleChange={handleChange} values={formData} />;
         case 2:
-            return <StepTwo nextStep={nextStep} prevStep={prevStep} handleChange={handleChange} values={formData} submitForm={submitForm}/>;
+            return <StepTwo nextStep={nextStep} prevStep={prevStep} handleChange={handleChange} values={formData} submitForm={submitForm} schoolData={schoolData}/>;
         case 3:
-            return <StepThree prevStep={prevStep} nextStep={nextStep} handleChange={handleChange} values={formData} />;
+            return <StepThree prevStep={prevStep} nextStep={nextStep} handleChange={handleChange} values={formData} schoolData={schoolData}/>;
         case 4:
-            return <StepFour prevStep={prevStep} nextStep={nextStep} handleChange={handleChange} values={formData} submitForm={submitForm}/>;
+            return <StepFour prevStep={prevStep} nextStep={nextStep} handleChange={handleChange} values={formData} submitForm={submitForm} schoolData={schoolData}/>;
         default:
             return <div>Erreur: Étape inconnue</div>;
     }

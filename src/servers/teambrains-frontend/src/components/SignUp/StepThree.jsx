@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const StepThree = ({ nextStep, prevStep, handleChange, values }) => {
+const StepThree = ({ nextStep, prevStep, handleChange, values, schoolData }) => {
     const [error, setError] = useState(''); // Ajoutez un état pour l'erreur
     const typesDeDeveloppeur = ["FrontEnd", "BackEnd", "FullStack", "Designer"];
 
@@ -18,6 +18,13 @@ const StepThree = ({ nextStep, prevStep, handleChange, values }) => {
             <div className="w-full max-w-xl">
                 <div className="bg-white border border-gray-200  shadow-md rounded px-8 pt-6 pb-8 mb-4">
                     <h3 className="mb-6"><span className="text-xl font-bold">Quel est votre profil ?</span><span className='ml-2 rounded p-1 bg-gray-200 text-xs'>ÉTAPE 2/3</span></h3>
+                    
+                    {schoolData && schoolData.school && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-sm text-blue-700">🎓 École : {schoolData.school.name}</p>
+                        </div>
+                    )}
+                    
                     {error && <p className="text-red-500 mb-2">{error}</p>} {/* Affiche l'erreur ici */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         {typesDeDeveloppeur.map((type, index) => (

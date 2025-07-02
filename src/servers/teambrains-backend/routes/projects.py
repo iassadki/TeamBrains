@@ -117,7 +117,10 @@ def join_project(project_id):
     if db.session.query(project_members).filter_by(project_id=project_id, user_id=user_id).first():
         return jsonify({"error": "Utilisateur déjà membre du projet"}), 400
     
+    # Vérifier que l'utilisateur a un type de développeur défini
     role = user.typeDeveloppeur
+    if not role:
+        return jsonify({"error": "Vous devez d'abord définir vos compétences dans votre profil pour rejoindre un projet"}), 400
 
     if role == "FullStack":
         backend_existe = db.session.query(project_members).filter_by(project_id=project_id, role="BackEnd").first() is not None
