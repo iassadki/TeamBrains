@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, User, Subscription, School
+from models import db, User, Subscription, School, Invoice
 import stripe
 import os
 from datetime import datetime, timedelta
@@ -78,8 +78,11 @@ def create_school_subscription():
                 'price_data': {
                     'currency': 'eur',
                     'product_data': {
-                        'name': f'TeamBrains - Plan École Partenariat',
-                        'description': f'Abonnement pour {student_count} étudiant(s) - École: {user.school.name}'
+                        'name': f'TeamBrains - Plan École Partenariat ({student_count} étudiant(s))',
+                        'metadata': {
+                            'school_name': user.school.name,
+                            'student_count': str(student_count)
+                        }
                     },
                     'unit_amount': monthly_amount,
                     'recurring': {
@@ -319,20 +322,26 @@ def update_partnership_student_count():
             try:
                 stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
                 
-                # Mettre à jour l'abonnement Stripe avec le nouveau montant
+                # Créer un nouveau prix pour le nouveau montant
+                new_price = stripe.Price.create(
+                    currency='eur',
+                    unit_amount=new_monthly_amount,
+                    recurring={'interval': 'month'},
+                    product_data={
+                        'name': f'TeamBrains - Plan École Partenariat ({new_student_count} étudiant(s))',
+                        'metadata': {
+                            'school_name': user.school.name,
+                            'student_count': str(new_student_count)
+                        }
+                    }
+                )
+                
+                # Mettre à jour l'abonnement avec le nouveau prix
                 stripe.Subscription.modify(
                     subscription.stripe_subscription_id,
                     items=[{
                         'id': stripe_subscription['items']['data'][0]['id'],
-                        'price_data': {
-                            'currency': 'eur',
-                            'product_data': {
-                                'name': f'TeamBrains - Plan École Partenariat',
-                                'description': f'Abonnement pour {new_student_count} étudiant(s) - École: {user.school.name}'
-                            },
-                            'unit_amount': new_monthly_amount,
-                            'recurring': {'interval': 'month'}
-                        }
+                        'price': new_price.id
                     }],
                     proration_behavior='always_invoice'
                 )
@@ -372,16 +381,29 @@ def get_partnership_subscription_status():
             plan_type='school_partnership'
         ).first()
         
+        # Aucun abonnement en base
         if not subscription:
             return jsonify({
                 'has_subscription': False,
                 'school': user.school.to_dict()
             })
         
+        # Vérifier si l'abonnement école est actif
+        active_statuses = ['active', 'trialing', 'past_due']
+        has_active_subscription = subscription.status in active_statuses
+        
+        # Log pour debug
+        logging.info(f"🔍 School {user.school_id} - Subscription status: {subscription.status}, has_active: {has_active_subscription}")
+        
         return jsonify({
-            'has_subscription': True,
+            'has_subscription': has_active_subscription,
             'subscription': subscription.to_dict(),
-            'school': user.school.to_dict()
+            'school': user.school.to_dict(),
+            'debug_info': {
+                'subscription_exists': True,
+                'status': subscription.status,
+                'is_active': has_active_subscription
+            }
         })
         
     except Exception as e:
@@ -552,4 +574,72 @@ def create_test_subscription():
         
     except Exception as e:
         logging.error(f"Erreur création abonnement test: {str(e)}")
-        return jsonify({'error': 'Erreur lors de la création de l\'abonnement de test'}), 500 
+        return jsonify({'error': 'Erreur lors de la création de l\'abonnement de test'}), 500
+
+@stripe_partnership_bp.route('/sync-subscription', methods=['POST'])
+@jwt_required()
+def manual_sync_partnership_subscription():
+    """Synchronisation manuelle de l'abonnement école depuis Stripe"""
+    try:
+        current_user_id = get_jwt_identity()
+        admin_user = User.query.get(current_user_id)
+        
+        if not admin_user or admin_user.role != 'school_admin' or not admin_user.school_id:
+            return jsonify({'error': 'Accès non autorisé'}), 403
+        
+        # Récupérer l'abonnement de l'école
+        subscription = Subscription.query.filter_by(school_id=admin_user.school_id).first()
+        if not subscription:
+            return jsonify({'error': 'Aucun abonnement trouvé pour cette école'}), 404
+        
+        # Récupérer l'abonnement depuis Stripe
+        try:
+            stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+        except stripe.error.StripeError as e:
+            return jsonify({'error': f'Erreur Stripe: {str(e)}'}), 400
+        
+        # Mettre à jour les informations locales
+        subscription.status = stripe_subscription.status
+        subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+        subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+        
+        # Récupérer les dernières factures
+        invoices = stripe.Invoice.list(
+            subscription=subscription.stripe_subscription_id,
+            limit=10
+        )
+        
+        # Synchroniser les factures manquantes
+        synced_invoices = 0
+        for stripe_invoice in invoices.data:
+            existing_invoice = Invoice.query.filter_by(stripe_invoice_id=stripe_invoice.id).first()
+            if not existing_invoice and stripe_invoice.status == 'paid':
+                invoice_record = Invoice(
+                    user_id=subscription.user_id,
+                    subscription_id=subscription.id,
+                    stripe_invoice_id=stripe_invoice.id,
+                    amount_paid=stripe_invoice.amount_paid,
+                    currency=stripe_invoice.currency,
+                    status=stripe_invoice.status,
+                    invoice_pdf=stripe_invoice.invoice_pdf,
+                    hosted_invoice_url=stripe_invoice.hosted_invoice_url,
+                    invoice_date=datetime.fromtimestamp(stripe_invoice.created),
+                    paid_at=datetime.fromtimestamp(stripe_invoice.status_transitions.paid_at) if stripe_invoice.status_transitions.paid_at else None
+                )
+                db.session.add(invoice_record)
+                synced_invoices += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Synchronisation école réussie',
+            'subscription_status': subscription.status,
+            'invoices_synced': synced_invoices,
+            'student_count': subscription.current_student_count,
+            'monthly_amount': subscription.total_monthly_amount
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erreur synchronisation école: {str(e)}")
+        return jsonify({'error': 'Erreur lors de la synchronisation'}), 500 

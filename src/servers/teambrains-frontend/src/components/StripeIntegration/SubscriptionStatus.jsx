@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSubscriptionAutoSync } from '../../hooks/useAutoSync';
 import { Check, X, Calendar, CreditCard, AlertCircle, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
 
 const SubscriptionStatus = () => {
@@ -12,12 +13,94 @@ const SubscriptionStatus = () => {
     const [updatePaymentLoading, setUpdatePaymentLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState(false);
     const [error, setError] = useState('');
+    const [diagnosticData, setDiagnosticData] = useState(null);
+    const [showDiagnostic, setShowDiagnostic] = useState(false);
+    
+    // Synchronisation automatique
+    const { syncNow } = useSubscriptionAutoSync((syncData) => {
+        if (syncData.status_changed) {
+            console.log('🔄 Abonnement synchronisé automatiquement');
+            fetchSubscriptionStatus();
+        }
+    });
 
     useEffect(() => {
         if (token) {
             fetchSubscriptionStatus();
         }
     }, [token]);
+
+    // Synchronisation automatique au chargement si aucun abonnement actif
+    useEffect(() => {
+        const autoSync = async () => {
+            if (subscription === null && !loading) {
+                console.log('🔄 Aucun abonnement actif détecté - Tentative de synchronisation automatique...');
+                try {
+                    const response = await fetch('http://localhost:5001/api/stripe/sync-subscription', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        console.log('✅ Synchronisation automatique réussie');
+                        // Recharger les données après la sync
+                        setTimeout(() => fetchSubscriptionStatus(), 1000);
+                    }
+                } catch (error) {
+                    console.log('⚠️ Synchronisation automatique échouée:', error);
+                }
+            }
+        };
+
+        // Délai de 2 secondes pour éviter la sync si les données arrivent rapidement
+        const timeout = setTimeout(autoSync, 2000);
+        return () => clearTimeout(timeout);
+    }, [subscription, loading, token]);
+
+    // Polling intelligent pour synchroniser automatiquement
+    useEffect(() => {
+        let pollInterval;
+        
+        const startPolling = () => {
+            // Vérifier toutes les 30 secondes si l'utilisateur est sur la page
+            pollInterval = setInterval(async () => {
+                // Ne faire le polling que si la page est visible
+                if (!document.hidden && token) {
+                    try {
+                        const response = await fetch('http://localhost:5001/api/stripe/subscription/status', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            // Si le statut a changé, mettre à jour
+                            const currentHasSubscription = subscription !== null;
+                            if (currentHasSubscription !== data.has_subscription) {
+                                console.log(`🔄 Changement de statut détecté: ${currentHasSubscription} → ${data.has_subscription}`);
+                                fetchSubscriptionStatus();
+                            }
+                        }
+                    } catch (error) {
+                        console.log('⚠️ Erreur lors du polling:', error);
+                    }
+                }
+            }, 30000); // 30 secondes
+        };
+
+        // Démarrer le polling après le chargement initial
+        const timeout = setTimeout(startPolling, 5000);
+
+        return () => {
+            clearTimeout(timeout);
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+        };
+    }, [token, subscription]);
 
     const fetchSubscriptionStatus = async () => {
         try {
@@ -188,6 +271,88 @@ const SubscriptionStatus = () => {
             setError('Erreur de connexion au serveur');
         } finally {
             setSyncLoading(false);
+        }
+    };
+
+    const handleDiagnostic = async () => {
+        try {
+            const response = await fetch('http://localhost:5001/api/stripe/webhook/test', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                }
+            });
+
+            const data = await response.json();
+            setDiagnosticData(data);
+            setShowDiagnostic(true);
+        } catch (error) {
+            console.error('Erreur diagnostic:', error);
+            setError('Erreur lors du diagnostic');
+        }
+    };
+
+    const handleManualSync = async () => {
+        setLoading(true);
+        setError('');
+        
+        try {
+            const response = await fetch('http://localhost:5001/api/stripe/sync-subscription', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Recharger les données
+                fetchSubscriptionStatus();
+                setError('');
+                console.log('Synchronisation réussie:', data);
+            } else {
+                setError(data.error || 'Erreur lors de la synchronisation');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            setError('Erreur de connexion au serveur');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleForceSync = async () => {
+        setLoading(true);
+        setError('');
+        
+        try {
+            const response = await fetch('http://localhost:5001/api/stripe/test/force-sync', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Recharger les données
+                fetchSubscriptionStatus();
+                setError('');
+                console.log('🧪 Synchronisation forcée réussie:', data);
+                alert(`Sync forcée réussie!\nAncien statut: ${data.old_status}\nNouveau statut: ${data.new_status}\nHas subscription: ${data.has_subscription}`);
+            } else {
+                setError(data.error || 'Erreur lors de la synchronisation forcée');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            setError('Erreur de connexion au serveur');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -512,6 +677,144 @@ const SubscriptionStatus = () => {
                     </div>
                 </div>
             </div>
+
+                                    {/* Boutons d'administration */}
+                        <div className="mt-6 flex flex-wrap gap-3">
+                            <button
+                                onClick={handleUpdatePaymentMethod}
+                                disabled={updatePaymentLoading}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {updatePaymentLoading ? 'Chargement...' : 'Mettre à jour le moyen de paiement'}
+                            </button>
+                            
+                            {/* Boutons de debug - seulement en mode développement ou pour les admins */}
+                            {(process.env.NODE_ENV === 'development' || window.location.search.includes('debug=true')) && (
+                                <>
+                                    <button
+                                        onClick={handleManualSync}
+                                        disabled={loading}
+                                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                                    >
+                                        {loading ? 'Synchronisation...' : 'Synchroniser l\'abonnement'}
+                                    </button>
+                                    
+                                    <button
+                                        onClick={handleForceSync}
+                                        disabled={loading}
+                                        className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:opacity-50"
+                                    >
+                                        {loading ? 'Sync forcée...' : '🧪 Sync forcée (Debug)'}
+                                    </button>
+                                    
+                                    <button
+                                        onClick={handleDiagnostic}
+                                        className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                                    >
+                                        🔍 Diagnostic Stripe
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Message informatif pour les utilisateurs */}
+                        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                            <p className="text-sm text-blue-700">
+                                ℹ️ Votre abonnement se synchronise automatiquement. En cas de problème, contactez le support.
+                            </p>
+                            {(process.env.NODE_ENV === 'development' || window.location.search.includes('debug=true')) && (
+                                <p className="text-xs text-blue-600 mt-2">
+                                    🛠️ Mode debug activé - Boutons de synchronisation disponibles
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Affichage des informations de debug si disponibles */}
+                        {subscription && subscription.debug_info && (
+                            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                                <h4 className="font-semibold text-blue-800 mb-2">🔍 Informations de debug :</h4>
+                                <div className="text-sm text-blue-700 space-y-1">
+                                    <div>Abonnement existe : {subscription.debug_info.subscription_exists ? '✅ Oui' : '❌ Non'}</div>
+                                    <div>Statut : <span className="font-mono">{subscription.debug_info.status}</span></div>
+                                    <div>Actif : {subscription.debug_info.is_active ? '✅ Oui' : '❌ Non'}</div>
+                                </div>
+                            </div>
+                        )}
+
+            {/* Modal de diagnostic */}
+            {showDiagnostic && diagnosticData && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto mx-4">
+                        <h3 className="text-lg font-bold mb-4">🔍 Diagnostic Stripe</h3>
+                        
+                        <div className="space-y-4">
+                            {/* Status de configuration */}
+                            <div>
+                                <h4 className="font-semibold mb-2">Configuration:</h4>
+                                <div className="bg-gray-50 p-3 rounded">
+                                    {Object.entries(diagnosticData.config_status).map(([key, value]) => (
+                                        <div key={key} className="flex justify-between">
+                                            <span>{key}:</span>
+                                            <span className={value === 'CONFIGURÉ' ? 'text-green-600' : 'text-red-600'}>
+                                                {value}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Connexion Stripe */}
+                            <div>
+                                <h4 className="font-semibold mb-2">Connexion Stripe:</h4>
+                                <div className={`p-3 rounded ${diagnosticData.stripe_connection === 'OK' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                                    {diagnosticData.stripe_connection}
+                                </div>
+                            </div>
+
+                            {/* Webhooks configurés */}
+                            <div>
+                                <h4 className="font-semibold mb-2">Webhooks configurés:</h4>
+                                <div className="bg-gray-50 p-3 rounded">
+                                    <pre className="text-xs overflow-x-auto">
+                                        {JSON.stringify(diagnosticData.configured_webhooks, null, 2)}
+                                    </pre>
+                                </div>
+                            </div>
+
+                            {/* URLs recommandées */}
+                            <div>
+                                <h4 className="font-semibold mb-2">URLs recommandées:</h4>
+                                <div className="bg-blue-50 p-3 rounded">
+                                    {diagnosticData.recommended_webhook_urls.map((url, index) => (
+                                        <div key={index} className="text-sm text-blue-800">{url}</div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Événements recommandés */}
+                            <div>
+                                <h4 className="font-semibold mb-2">Événements recommandés:</h4>
+                                <div className="bg-blue-50 p-3 rounded">
+                                    {diagnosticData.recommended_events.map((event, index) => (
+                                        <span key={index} className="inline-block bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs mr-2 mb-2">
+                                            {event}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                onClick={() => setShowDiagnostic(false)}
+                                className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

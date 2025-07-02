@@ -148,31 +148,57 @@ def stripe_webhook():
         logging.error(f"Erreur webhook: {str(e)}")
         return jsonify({'error': 'Erreur de traitement'}), 400
     
-    # Traiter les événements
-    if event['type'] == 'checkout.session.completed':
-        handle_checkout_session_completed(event['data']['object'])
-    elif event['type'] == 'invoice.payment_succeeded':
-        handle_invoice_payment_succeeded(event['data']['object'])
-    elif event['type'] == 'invoice.payment_failed':
-        handle_invoice_payment_failed(event['data']['object'])
-    elif event['type'] == 'customer.subscription.updated':
-        handle_subscription_updated(event['data']['object'])
-    elif event['type'] == 'customer.subscription.deleted':
-        handle_subscription_deleted(event['data']['object'])
-    elif event['type'] == 'invoice.payment_action_required':
-        handle_payment_action_required(event['data']['object'])
+    # Traiter les événements avec logging détaillé
+    event_type = event['type']
+    logging.info(f"🎯 PROCESSING EVENT: {event_type}")
     
-    return jsonify({'status': 'success'})
+    try:
+        if event_type == 'checkout.session.completed':
+            handle_checkout_session_completed(event['data']['object'])
+        elif event_type == 'invoice.payment_succeeded':
+            handle_invoice_payment_succeeded(event['data']['object'])
+        elif event_type == 'invoice.payment_failed':
+            handle_invoice_payment_failed(event['data']['object'])
+        elif event_type == 'customer.subscription.updated':
+            handle_subscription_updated(event['data']['object'])
+        elif event_type == 'customer.subscription.deleted':
+            handle_subscription_deleted(event['data']['object'])
+        elif event_type == 'invoice.payment_action_required':
+            handle_payment_action_required(event['data']['object'])
+        else:
+            logging.info(f"ℹ️ WEBHOOK IGNORED: Event type {event_type} not handled")
+        
+        logging.info(f"✅ WEBHOOK COMPLETED: {event_type} processed successfully")
+        return jsonify({'status': 'success'})
+        
+    except Exception as e:
+        logging.error(f"❌ WEBHOOK PROCESSING ERROR: {event_type} failed - {str(e)}")
+        logging.error(f"Event data: {event}")
+        # Retourner 200 pour éviter que Stripe ne retente indéfiniment
+        return jsonify({'status': 'error', 'message': str(e)}), 200
 
 def handle_checkout_session_completed(session):
     """Traiter la completion d'une session de checkout"""
     try:
-        logging.info(f"Session reçue: {session}")
+        logging.info(f"✅ WEBHOOK: Session checkout completed reçue - ID: {session.get('id')}")
         
         # Vérifier si les métadonnées existent (vraie session vs test)
         if not session.get('metadata') or not session['metadata'].get('user_id'):
-            logging.warning("Session sans métadonnées user_id - probablement un test Stripe CLI")
-            return
+            logging.warning("⚠️ Session sans métadonnées user_id - recherche alternative par customer_id")
+            
+            # Essayer de retrouver l'utilisateur par customer_id
+            customer_id = session.get('customer')
+            if customer_id:
+                subscription = Subscription.query.filter_by(stripe_customer_id=customer_id).first()
+                if subscription:
+                    logging.info(f"🔍 Utilisateur retrouvé via customer_id: {subscription.user_id}")
+                    session['metadata'] = {'user_id': subscription.user_id}
+                else:
+                    logging.error(f"❌ Aucun abonnement trouvé pour customer_id: {customer_id}")
+                    return
+            else:
+                logging.error("❌ Pas de customer_id disponible non plus")
+                return
         
         user_id = session['metadata']['user_id']
         plan_type = session['metadata']['plan_type']
@@ -220,16 +246,17 @@ def handle_checkout_session_completed(session):
         db.session.add(subscription)
         db.session.commit()
         
-        logging.info(f"Abonnement créé/mis à jour pour l'utilisateur {user_id}")
+        logging.info(f"✅ WEBHOOK SUCCESS: Abonnement créé/mis à jour pour l'utilisateur {user_id} - Plan: {plan_type}")
         
     except Exception as e:
-        logging.error(f"Erreur traitement checkout session: {str(e)}")
+        db.session.rollback()
+        logging.error(f"❌ WEBHOOK ERROR - Checkout session: {str(e)}")
         logging.error(f"Session data: {session}")
 
 def handle_invoice_payment_succeeded(invoice):
     """Traiter le paiement réussi d'une facture"""
     try:
-        logging.info(f"Traitement facture: {invoice}")
+        logging.info(f"💰 WEBHOOK: Invoice payment succeeded - ID: {invoice.get('id')}")
         
         # Récupérer l'ID de subscription (peut être dans plusieurs endroits)
         stripe_subscription_id = None
@@ -307,8 +334,11 @@ def handle_subscription_updated(subscription):
 def handle_subscription_deleted(subscription):
     """Traiter la suppression d'un abonnement"""
     try:
+        logging.info(f"🚫 WEBHOOK: Subscription deleted - ID: {subscription.get('id')}")
+        
         db_subscription = Subscription.query.filter_by(stripe_subscription_id=subscription['id']).first()
         if db_subscription:
+            old_status = db_subscription.status
             db_subscription.status = 'canceled'
             # Réinitialiser les compteurs d'échec lors de l'annulation
             db_subscription.payment_failed_count = 0
@@ -316,10 +346,14 @@ def handle_subscription_deleted(subscription):
             db_subscription.unpaid_invoice_id = None
             db.session.commit()
             
-        logging.info(f"Abonnement annulé: {subscription['id']}")
+            logging.info(f"✅ WEBHOOK SUCCESS: Abonnement annulé - User: {db_subscription.user_id}, Status: {old_status} → canceled")
+        else:
+            logging.warning(f"⚠️ WEBHOOK: Abonnement {subscription['id']} non trouvé en base pour annulation")
         
     except Exception as e:
-        logging.error(f"Erreur annulation abonnement: {str(e)}")
+        db.session.rollback()
+        logging.error(f"❌ WEBHOOK ERROR - Subscription deletion: {str(e)}")
+        logging.error(f"Subscription data: {subscription}")
 
 def handle_invoice_payment_failed(invoice):
     """Traiter l'échec d'un paiement de facture"""
@@ -404,19 +438,32 @@ def get_subscription_status():
         user_id = get_jwt_identity()
         subscription = Subscription.query.filter_by(user_id=user_id).first()
         
+        # Aucun abonnement en base
         if not subscription:
             return jsonify({
                 'has_subscription': False,
                 'subscription': None
             })
         
+        # Vérifier si l'abonnement est actif (statuts valides)
+        active_statuses = ['active', 'trialing', 'past_due']  # past_due = en retard mais encore valide
+        has_active_subscription = subscription.status in active_statuses
+        
+        # Log pour debug
+        logging.info(f"🔍 User {user_id} - Subscription status: {subscription.status}, has_active: {has_active_subscription}")
+        
         return jsonify({
-            'has_subscription': True,
-            'subscription': subscription.to_dict()
+            'has_subscription': has_active_subscription,
+            'subscription': subscription.to_dict(),
+            'debug_info': {
+                'subscription_exists': True,
+                'status': subscription.status,
+                'is_active': has_active_subscription
+            }
         })
         
     except Exception as e:
-        logging.error(f"Erreur récupération statut: {str(e)}")
+        logging.error(f"❌ Erreur récupération statut: {str(e)}")
         return jsonify({'error': 'Erreur serveur'}), 500
 
 @stripe_bp.route('/invoices', methods=['GET'])
@@ -687,7 +734,7 @@ def enable_webhook(webhook_id):
             
     except Exception as e:
         logging.error(f"Erreur activation webhook: {str(e)}")
-        return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500 
+        return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500
 
 # ===============================
 # NOUVELLES ROUTES FACTURATION HYBRIDE ÉCOLES
@@ -734,21 +781,24 @@ def update_school_student_count():
                 # Récupérer l'abonnement Stripe
                 stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
                 
-                # Mettre à jour l'abonnement avec le nouveau montant annuel
+                # Créer un nouveau prix pour le nouveau montant annuel
                 yearly_amount = new_total * 12
+                new_price = stripe.Price.create(
+                    currency='eur',
+                    unit_amount=yearly_amount,
+                    recurring={'interval': 'year'},
+                    product_data={
+                        'name': 'TeamBrains - Plan École (Hybride)',
+                        'description': f'Plan de base (120€/an) + {new_student_count} étudiants (2€/mois chacun)'
+                    }
+                )
+                
+                # Mettre à jour l'abonnement avec le nouveau prix
                 stripe.Subscription.modify(
                     subscription.stripe_subscription_id,
                     items=[{
                         'id': stripe_subscription['items']['data'][0]['id'],
-                        'price_data': {
-                            'currency': 'eur',
-                            'product_data': {
-                                'name': 'TeamBrains - Plan École (Hybride)',
-                                'description': f'Plan de base (120€/an) + {new_student_count} étudiants (2€/mois chacun)'
-                            },
-                            'unit_amount': yearly_amount,
-                            'recurring': {'interval': 'year'}
-                        }
+                        'price': new_price.id
                     }]
                 )
                 
@@ -970,3 +1020,285 @@ def associate_school_subscription():
     except Exception as e:
         logging.error(f"Erreur association école-abonnement: {str(e)}")
         return jsonify({'error': 'Erreur lors de l\'association'}), 500
+
+@stripe_bp.route('/webhook/test', methods=['GET'])
+def test_webhook_config():
+    """Endpoint de diagnostic pour vérifier la configuration des webhooks"""
+    try:
+        config_status = {
+            'stripe_secret_key': 'CONFIGURÉ' if os.environ.get('STRIPE_SECRET_KEY') else 'MANQUANT',
+            'stripe_publishable_key': 'CONFIGURÉ' if os.environ.get('STRIPE_PUBLISHABLE_KEY') else 'MANQUANT',
+            'webhook_secret': 'CONFIGURÉ' if os.environ.get('STRIPE_WEBHOOK_SECRET') else 'MANQUANT',
+            'partnership_webhook_secret': 'CONFIGURÉ' if os.environ.get('STRIPE_PARTNERSHIP_WEBHOOK_SECRET') else 'MANQUANT'
+        }
+        
+        # Tester la connexion à Stripe
+        try:
+            # Lister les customers pour tester l'API
+            customers = stripe.Customer.list(limit=1)
+            stripe_connection = 'OK'
+        except Exception as e:
+            stripe_connection = f'ERREUR: {str(e)}'
+        
+        # Vérifier les webhooks configurés côté Stripe
+        try:
+            webhook_endpoints = stripe.WebhookEndpoint.list()
+            configured_webhooks = []
+            for endpoint in webhook_endpoints.data:
+                configured_webhooks.append({
+                    'url': endpoint.url,
+                    'enabled_events': endpoint.enabled_events,
+                    'status': endpoint.status
+                })
+        except Exception as e:
+            configured_webhooks = f'ERREUR: {str(e)}'
+        
+        return jsonify({
+            'config_status': config_status,
+            'stripe_connection': stripe_connection,
+            'configured_webhooks': configured_webhooks,
+            'recommended_webhook_urls': [
+                'http://localhost:5001/api/stripe/webhook',  # Pour abonnements étudiants
+                'http://localhost:5001/api/partnership/stripe/webhook'  # Pour abonnements écoles
+            ],
+            'recommended_events': [
+                'checkout.session.completed',
+                'invoice.payment_succeeded',
+                'invoice.payment_failed',
+                'customer.subscription.updated',
+                'customer.subscription.deleted',
+                'invoice.payment_action_required'
+            ]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erreur de diagnostic: {str(e)}'}), 500
+
+@stripe_bp.route('/sync-subscription', methods=['POST'])
+@jwt_required()
+def manual_sync_subscription():
+    """Synchronisation manuelle de l'abonnement depuis Stripe"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Récupérer l'abonnement en base
+        subscription = Subscription.query.filter_by(user_id=current_user_id).first()
+        if not subscription:
+            return jsonify({'error': 'Aucun abonnement trouvé'}), 404
+        
+        # Récupérer l'abonnement depuis Stripe
+        try:
+            stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+        except stripe.error.StripeError as e:
+            return jsonify({'error': f'Erreur Stripe: {str(e)}'}), 400
+        
+        # Mettre à jour les informations locales
+        subscription.status = stripe_subscription.status
+        subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+        subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+        
+        # Récupérer les dernières factures
+        invoices = stripe.Invoice.list(
+            subscription=subscription.stripe_subscription_id,
+            limit=10
+        )
+        
+        # Synchroniser les factures manquantes
+        synced_invoices = 0
+        for stripe_invoice in invoices.data:
+            existing_invoice = Invoice.query.filter_by(stripe_invoice_id=stripe_invoice.id).first()
+            if not existing_invoice and stripe_invoice.status == 'paid':
+                invoice_record = Invoice(
+                    user_id=subscription.user_id,
+                    subscription_id=subscription.id,
+                    stripe_invoice_id=stripe_invoice.id,
+                    amount_paid=stripe_invoice.amount_paid,
+                    currency=stripe_invoice.currency,
+                    status=stripe_invoice.status,
+                    invoice_pdf=stripe_invoice.invoice_pdf,
+                    hosted_invoice_url=stripe_invoice.hosted_invoice_url,
+                    invoice_date=datetime.fromtimestamp(stripe_invoice.created),
+                    paid_at=datetime.fromtimestamp(stripe_invoice.status_transitions.paid_at) if stripe_invoice.status_transitions.paid_at else None
+                )
+                db.session.add(invoice_record)
+                synced_invoices += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Synchronisation réussie',
+            'subscription_status': subscription.status,
+            'invoices_synced': synced_invoices
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erreur synchronisation manuelle: {str(e)}")
+        return jsonify({'error': 'Erreur lors de la synchronisation'}), 500
+
+@stripe_bp.route('/test/force-sync', methods=['POST'])
+@jwt_required()
+def force_sync_subscription():
+    """Forcer la synchronisation d'un abonnement (pour tests/debug)"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        # Si un stripe_subscription_id est fourni, l'utiliser
+        stripe_subscription_id = data.get('stripe_subscription_id')
+        
+        if stripe_subscription_id:
+            # Récupérer directement depuis Stripe
+            try:
+                stripe_subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                logging.info(f"🧪 TEST: Retrieved subscription from Stripe - Status: {stripe_subscription.status}")
+            except stripe.error.StripeError as e:
+                return jsonify({'error': f'Subscription non trouvé sur Stripe: {str(e)}'}), 404
+        else:
+            # Chercher l'abonnement existant de l'utilisateur
+            subscription = Subscription.query.filter_by(user_id=current_user_id).first()
+            if not subscription:
+                return jsonify({'error': 'Aucun abonnement trouvé pour cet utilisateur'}), 404
+            
+            stripe_subscription_id = subscription.stripe_subscription_id
+            stripe_subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # Mettre à jour ou créer l'abonnement en base
+        subscription = Subscription.query.filter_by(stripe_subscription_id=stripe_subscription_id).first()
+        if not subscription:
+            subscription = Subscription()
+            subscription.user_id = current_user_id
+            subscription.stripe_subscription_id = stripe_subscription_id
+        
+        old_status = subscription.status if hasattr(subscription, 'status') else 'None'
+        
+        # Mettre à jour tous les champs
+        subscription.stripe_customer_id = stripe_subscription.customer
+        subscription.status = stripe_subscription.status
+        subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+        subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+        
+        db.session.add(subscription)
+        db.session.commit()
+        
+        # Vérifier le nouveau statut has_subscription
+        active_statuses = ['active', 'trialing', 'past_due']
+        has_active_subscription = subscription.status in active_statuses
+        
+        logging.info(f"🧪 TEST SYNC COMPLETED: User {current_user_id}, Status: {old_status} → {subscription.status}, has_subscription: {has_active_subscription}")
+        
+        return jsonify({
+            'message': 'Synchronisation forcée réussie',
+            'subscription_id': stripe_subscription_id,
+            'old_status': old_status,
+            'new_status': subscription.status,
+            'has_subscription': has_active_subscription,
+            'stripe_data': {
+                'status': stripe_subscription.status,
+                'current_period_start': stripe_subscription.current_period_start,
+                'current_period_end': stripe_subscription.current_period_end,
+                'customer': stripe_subscription.customer
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"❌ Erreur sync forcée: {str(e)}")
+        return jsonify({'error': 'Erreur lors de la synchronisation forcée'}), 500
+
+@stripe_bp.route('/test/webhook-events', methods=['GET'])
+@jwt_required() 
+def list_recent_webhook_events():
+    """Lister les événements webhook récents depuis Stripe (pour diagnostic)"""
+    try:
+        # Récupérer les 20 derniers événements
+        events = stripe.Event.list(limit=20)
+        
+        webhook_events = []
+        for event in events.data:
+            webhook_events.append({
+                'id': event.id,
+                'type': event.type,
+                'created': datetime.fromtimestamp(event.created).isoformat(),
+                'livemode': event.livemode,
+                'object_id': event.data.object.get('id', 'N/A'),
+                'processed_locally': 'unknown'  # On ne peut pas savoir facilement
+            })
+        
+        return jsonify({
+            'recent_events': webhook_events,
+            'total_events': len(webhook_events),
+            'note': 'Ces événements ont été créés sur Stripe. Pour savoir s\'ils ont été traités localement, vérifiez les logs.'
+        }), 200
+        
+    except Exception as e:
+        logging.error(f"Erreur récupération événements: {str(e)}")
+        return jsonify({'error': 'Erreur lors de la récupération des événements'}), 500
+
+@stripe_bp.route('/quick-sync', methods=['POST'])
+@jwt_required()
+def quick_sync_subscription():
+    """Synchronisation rapide et légère pour les actions utilisateur"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Récupérer l'abonnement local
+        subscription = Subscription.query.filter_by(user_id=current_user_id).first()
+        if not subscription:
+            return jsonify({'has_subscription': False, 'message': 'Aucun abonnement'}), 200
+        
+        # Vérifier rapidement le statut sur Stripe (sans créer de factures etc.)
+        try:
+            stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+            
+            # Si le statut a changé, mettre à jour
+            if subscription.status != stripe_subscription.status:
+                old_status = subscription.status
+                subscription.status = stripe_subscription.status
+                subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+                subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+                db.session.commit()
+                
+                logging.info(f"⚡ Quick sync: User {current_user_id}, {old_status} → {stripe_subscription.status}")
+                
+                # Calculer has_subscription
+                active_statuses = ['active', 'trialing', 'past_due']
+                has_active = stripe_subscription.status in active_statuses
+                
+                return jsonify({
+                    'has_subscription': has_active,
+                    'status_changed': True,
+                    'old_status': old_status,
+                    'new_status': stripe_subscription.status,
+                    'message': 'Statut mis à jour'
+                }), 200
+            else:
+                # Pas de changement
+                active_statuses = ['active', 'trialing', 'past_due']
+                has_active = subscription.status in active_statuses
+                
+                return jsonify({
+                    'has_subscription': has_active,
+                    'status_changed': False,
+                    'status': subscription.status,
+                    'message': 'Aucun changement'
+                }), 200
+                
+        except stripe.error.StripeError as e:
+            if 'No such subscription' in str(e):
+                # L'abonnement n'existe plus sur Stripe
+                subscription.status = 'canceled'
+                db.session.commit()
+                
+                return jsonify({
+                    'has_subscription': False,
+                    'status_changed': True,
+                    'new_status': 'canceled',
+                    'message': 'Abonnement introuvable sur Stripe'
+                }), 200
+            else:
+                raise e
+        
+    except Exception as e:
+        logging.error(f"❌ Erreur quick sync: {str(e)}")
+        return jsonify({'error': 'Erreur lors de la vérification rapide'}), 500
