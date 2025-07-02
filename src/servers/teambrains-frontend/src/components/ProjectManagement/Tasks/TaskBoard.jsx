@@ -24,11 +24,9 @@ const TaskBoard = (projectId) => {
         percent_completion: 0,
         file_url: '',
         file_name: '',
-        priority: 'moyenne',
-        sprint: ''
+        priority: 'moyenne'
     });
     const [projectMembers, setProjectMembers] = useState([]);
-    const [availableSprints, setAvailableSprints] = useState([]);
     const [error, setError] = useState(null);
     const [draggedTask, setDraggedTask] = useState(null);
     const [projectProgress, setProjectProgress] = useState(0);
@@ -84,19 +82,6 @@ const TaskBoard = (projectId) => {
                     });
                     setTasks(tasksResponse.data.tasks);
                     organizeTasks(tasksResponse.data.tasks);
-
-                    // Récupération des sprints disponibles
-                    try {
-                        const sprintsResponse = await axios.get(`http://localhost:5001/sprint/${project.id}/list`, {
-                            headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                            }
-                        });
-                        setAvailableSprints(sprintsResponse.data.sprints);
-                    } catch (sprintError) {
-                        console.log('Aucun sprint disponible ou erreur API sprint');
-                        setAvailableSprints([]);
-                    }
 
                     setLoading(false);
                 } catch (error) {
@@ -291,8 +276,7 @@ const TaskBoard = (projectId) => {
                 assignee_id: formData.assignee_id || currentUser.id,
                 file_url: formData.file_url || null,
                 file_name: formData.file_name || null,
-                priority: formData.priority,
-                sprint: formData.sprint || null
+                priority: formData.priority
             };
 
             console.log('Payload envoyé:', payload);
@@ -325,8 +309,7 @@ const TaskBoard = (projectId) => {
                 percent_completion: 0,
                 file_url: '',
                 file_name: '',
-                priority: 'moyenne',
-                sprint: ''
+                priority: 'moyenne'
             });
             setShowCreateForm(false);
 
@@ -349,8 +332,7 @@ const TaskBoard = (projectId) => {
                 percent_completion: parseInt(formData.percent_completion),
                 file_url: formData.file_url || null,
                 file_name: formData.file_name || null,
-                priority: formData.priority,
-                sprint: formData.sprint || null
+                priority: formData.priority
             };
 
             const response = await axios.put(
@@ -420,8 +402,7 @@ const TaskBoard = (projectId) => {
             percent_completion: task.percent_completion,
             file_url: task.file_url || '',
             file_name: task.file_name || '',
-            priority: task.priority || 'moyenne',
-            sprint: task.sprint || ''
+            priority: task.priority || 'moyenne'
         });
         setShowEditForm(true);
     };
@@ -604,22 +585,7 @@ const TaskBoard = (projectId) => {
                                     <option value="haute">🟥 Haute</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Sprint</label>
-                                <select
-                                    name="sprint"
-                                    value={formData.sprint}
-                                    onChange={handleInputChange}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                >
-                                    <option value="">Aucun sprint</option>
-                                    {availableSprints.map(sprint => (
-                                        <option key={sprint} value={sprint}>
-                                            {sprint}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+ 
                         </div>
                         <div className="mt-4 flex justify-end">
                             <button
@@ -722,22 +688,7 @@ const TaskBoard = (projectId) => {
                                     <option value="haute">🟥 Haute</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Sprint</label>
-                                <select
-                                    name="sprint"
-                                    value={formData.sprint}
-                                    onChange={handleInputChange}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                >
-                                    <option value="">Aucun sprint</option>
-                                    {availableSprints.map(sprint => (
-                                        <option key={sprint} value={sprint}>
-                                            {sprint}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Progression (%)</label>
                                 <input
@@ -829,16 +780,11 @@ const TaskBoard = (projectId) => {
                                         <p className="text-sm text-gray-600 mt-2 line-clamp-2">{task.description}</p>
                                     )}
 
-                                    {/* Badges pour priorité et sprint */}
+                                    {/* Badges pour priorité */}
                                     <div className="flex flex-wrap gap-1 mt-2">
                                         {task.priority && (
                                             <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(task.priority)}`}>
                                                 {getPriorityIcon(task.priority)} {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                                            </span>
-                                        )}
-                                        {task.sprint && (
-                                            <span className="px-2 py-1 text-xs rounded-full border bg-indigo-100 text-indigo-800 border-indigo-200">
-                                                🏃 {task.sprint}
                                             </span>
                                         )}
                                     </div>

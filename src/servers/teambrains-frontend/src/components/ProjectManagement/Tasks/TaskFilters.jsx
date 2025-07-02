@@ -16,7 +16,6 @@ const TaskFilters = ({
     const [project, setProject] = useState(null);
     const [allTasks, setAllTasks] = useState([]);
     const [filteredTasks, setFilteredTasks] = useState([]);
-    const [availableSprints, setAvailableSprints] = useState([]);
     const [taskValidations, setTaskValidations] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -42,7 +41,7 @@ const TaskFilters = ({
         }
     }, [slug]);
 
-    // Récupération des tâches et des sprints
+    // Récupération des tâches
     useEffect(() => {
         const fetchData = async () => {
             if (project?.id) {
@@ -56,14 +55,6 @@ const TaskFilters = ({
                         }
                     });
                     setAllTasks(tasksResponse.data.tasks);
-
-                    // Récupération des sprints disponibles
-                    const sprintsResponse = await axios.get(`http://localhost:5001/sprint/${project.id}/list`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                        }
-                    });
-                    setAvailableSprints(sprintsResponse.data.sprints);
 
                     // Récupération des validations des tâches
                     const validationPromises = tasksResponse.data.tasks.map(task =>
@@ -103,25 +94,6 @@ const TaskFilters = ({
         // Filtre par assigné
         if (filters.assignee) {
             filtered = filtered.filter(task => task.assignee_id === filters.assignee);
-        }
-
-        // Filtre par sprint
-        if (filters.sprint) {
-            if (filters.sprint === 'current') {
-                // Pour le sprint actuel, on prend le sprint le plus récent ou le plus utilisé
-                const sprintCounts = {};
-                allTasks.forEach(task => {
-                    if (task.sprint) {
-                        sprintCounts[task.sprint] = (sprintCounts[task.sprint] || 0) + 1;
-                    }
-                });
-                const currentSprint = Object.keys(sprintCounts).sort((a, b) => sprintCounts[b] - sprintCounts[a])[0];
-                if (currentSprint) {
-                    filtered = filtered.filter(task => task.sprint === currentSprint);
-                }
-            } else {
-                filtered = filtered.filter(task => task.sprint === filters.sprint);
-            }
         }
 
         // Filtre par priorité
@@ -178,7 +150,6 @@ const TaskFilters = ({
             assignee: '',
             status: '',
             dueDate: '',
-            sprint: '',
             priority: ''
         });
     };
@@ -249,14 +220,6 @@ const TaskFilters = ({
         }
     };
 
-    // Obtenir le nom du sprint affiché
-    const getSprintDisplayName = (sprintValue) => {
-        if (sprintValue === 'current') {
-            return 'Sprint actuel';
-        }
-        return sprintValue;
-    };
-
     // Obtenir le statut de validation d'une tâche
     const getValidationStatus = (taskId) => {
         return taskValidations[taskId]?.current_status || 'not_started';
@@ -315,23 +278,6 @@ const TaskFilters = ({
                         {projectMembers.map(member => (
                             <option key={member.user_id} value={member.user_id}>
                                 {member.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className="mb-2 md:mb-0">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Sprint</label>
-                    <select
-                        value={filters.sprint}
-                        onChange={(e) => handleFilterChange('sprint', e.target.value)}
-                        className="w-full md:w-auto text-sm p-1.5 border border-gray-300 rounded"
-                    >
-                        <option value="">Tous les sprints</option>
-                        <option value="current">Voir le sprint actuel</option>
-                        {availableSprints.map(sprint => (
-                            <option key={sprint} value={sprint}>
-                                {sprint}
                             </option>
                         ))}
                     </select>
@@ -397,18 +343,12 @@ const TaskFilters = ({
                         <Filter className="mr-2" size={18} />
                         Tâches filtrées ({filteredTasks.length})
                     </h3>
-                    {(filters.assignee || filters.status || filters.dueDate || filters.sprint || filters.priority) && (
+                    {(filters.assignee || filters.status || filters.dueDate || filters.priority) && (
                         <div className="mt-2 flex flex-wrap gap-2">
                             {filters.assignee && (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                     <User size={12} className="mr-1" />
                                     Assigné: {getMemberName(filters.assignee)}
-                                </span>
-                            )}
-                            {filters.sprint && (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                    <Clock size={12} className="mr-1" />
-                                    Sprint: {getSprintDisplayName(filters.sprint)}
                                 </span>
                             )}
                             {filters.priority && (
@@ -542,12 +482,6 @@ const TaskFilters = ({
                                                 <Calendar size={12} className="mr-1" />
                                                 {formatDate(task.due_date)}
                                             </div>
-                                            {task.sprint && (
-                                                <div className="flex items-center">
-                                                    <span className="mr-1">🏃</span>
-                                                    Sprint: {task.sprint}
-                                                </div>
-                                            )}
                                             {task.percent_completion > 0 && task.percent_completion < 100 && (
                                                 <div className="flex items-center">
                                                     <Clock size={12} className="mr-1" />
