@@ -8,7 +8,7 @@ import ProfileHeader from './Profile/ProfileHeader';
 import PersonalInfoSection from './Profile/PersonalInfoSection';
 import SocialLinksSection from './Profile/SocialLinksSection';
 import TechnicalSkillsSection from './Profile/TechnicalSkillsSection';
-// import SkillsManagementSection from './Profile/SkillsManagementSectionOLD';
+// import SkillsManagementSection from './Profile/SkillsManagementSection';
 import ObjectivesSection from './Profile/ObjectivesSection';
 import EducationSection from './Profile/EducationSection';
 import ProjectsSection from './Profile/ProjectsSection';
@@ -168,6 +168,19 @@ const Profile = () => {
         setShowProjectModal(true);
     };
 
+    const handleProjectVisibilityChange = (cvProjectId, isVisible) => {
+        // Mettre à jour l'état local des projets CV
+        setCvProjects(prevProjects =>
+            prevProjects.map(project =>
+                project.id === cvProjectId
+                    ? { ...project, is_visible: isVisible }
+                    : project
+            )
+        );
+
+        console.log(`Projet CV ${cvProjectId} mis à jour: ${isVisible ? 'visible' : 'masqué'}`);
+    };
+
     const handleUrlChange = (field, value) => {
         const normalizedValue = normalizeUrl(value);
         setCvProfile({ ...cvProfile, [field]: normalizedValue });
@@ -254,7 +267,7 @@ const Profile = () => {
                             handleSelectTech={handleSelectTech}
                         />
 
-                        {/* Nouvelle section de gestion des compétences */}
+                        {/* Nouvelle section de gestion des compétences - COMMENTÉE */}
                         {/* <SkillsManagementSection
                             userInfo={userInfo}
                         /> */}
@@ -280,6 +293,7 @@ const Profile = () => {
                             formatDate={formatDate}
                             getTaskStatusColor={getTaskStatusColor}
                             getTaskStatusLabel={getTaskStatusLabel}
+                            onProjectVisibilityChange={handleProjectVisibilityChange}
                         />
                     </div>
                 </div>
