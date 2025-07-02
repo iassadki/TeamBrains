@@ -582,27 +582,34 @@ const SchoolDashboard = () => {
                                     <div key={token.id} className="px-6 py-4 flex items-center justify-between">
                                         <div className="flex-1">
                                             <div className="flex items-center space-x-3">
-                                                <code className="bg-gray-100 px-3 py-1 rounded text-lg font-mono">
-                                                    {token.token}
-                                                </code>
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                    token.can_be_used 
-                                                        ? 'bg-green-100 text-green-800' 
-                                                        : 'bg-red-100 text-red-800'
-                                                }`}>
-                                                    {token.can_be_used ? 'Actif' : 'Inactif'}
-                                                </span>
+                                                <div className="flex flex-col space-y-1">
+                                                    <div className="flex items-center space-x-2">
+                                                        <code className="bg-blue-100 px-3 py-1 rounded text-lg font-mono font-bold text-blue-800">
+                                                            {token.token}
+                                                        </code>
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                            token.can_be_used 
+                                                                ? 'bg-green-100 text-green-800' 
+                                                                : 'bg-red-100 text-red-800'
+                                                        }`}>
+                                                            {token.can_be_used ? 'Actif' : 'Inactif'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="font-medium text-gray-900">
+                                                        📋 {token.name}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="mt-1 text-sm text-gray-500">
+                                            <div className="mt-2 text-sm text-gray-500">
                                                 {token.current_uses}/{token.max_uses || '∞'} utilisations
                                                 {token.expires_at && (
                                                     <span className="ml-3">
-                                                        Expire le {new Date(token.expires_at).toLocaleDateString()}
+                                                        • Expire le {new Date(token.expires_at).toLocaleDateString()}
                                                     </span>
                                                 )}
                                                 {token.description && (
-                                                    <div className="mt-1 text-xs text-gray-400">
-                                                        {token.description}
+                                                    <div className="mt-1 text-xs text-gray-400 bg-gray-50 p-2 rounded">
+                                                        💬 {token.description}
                                                     </div>
                                                 )}
                                             </div>
