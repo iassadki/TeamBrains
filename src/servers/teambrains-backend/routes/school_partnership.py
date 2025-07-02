@@ -694,11 +694,16 @@ def get_student_cv_projects(student_id):
         for cv_project in cv_projects:
             project_dict = cv_project.to_dict()
             
-            # Récupérer les tâches assignées à l'étudiant pour ce projet
-            user_tasks = Task.query.filter_by(
-                project_id=cv_project.project_id,
-                assignee_id=student_id
-            ).all()
+            # Si l'étudiant est l'entrepreneur/créateur du projet, montrer toutes les tâches
+            project = Project.query.get(cv_project.project_id)
+            if student and student.role == 'businessman' and project and project.creator_id == student_id:
+                user_tasks = Task.query.filter_by(project_id=cv_project.project_id).all()
+            else:
+                # Sinon, ne montrer que les tâches assignées à l'étudiant
+                user_tasks = Task.query.filter_by(
+                    project_id=cv_project.project_id,
+                    assignee_id=student_id
+                ).all()
             
             project_dict['tasks'] = [task.to_dict() for task in user_tasks]
             cv_projects_list.append(project_dict)
@@ -715,11 +720,8 @@ def get_student_cv_projects(student_id):
                     # Calculer la taille de l'équipe
                     team_size = db.session.query(project_members).filter_by(project_id=project.id).count()
                     
-                    # Récupérer les tâches assignées à l'entrepreneur pour ce projet
-                    user_tasks = Task.query.filter_by(
-                        project_id=project.id,
-                        assignee_id=student_id
-                    ).all()
+                    # Pour les entrepreneurs/créateurs, récupérer TOUTES les tâches du projet
+                    user_tasks = Task.query.filter_by(project_id=project.id).all()
                     
                     # Créer l'entrée CV pour le projet créé
                     created_cv_project = {

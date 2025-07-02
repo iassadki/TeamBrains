@@ -63,10 +63,16 @@ def get_cv_projects():
     for cv_project in cv_projects:
         project_dict = cv_project.to_dict()
         
-        user_tasks = Task.query.filter_by(
-            project_id=cv_project.project_id,
-            assignee_id=user_id
-        ).all()
+        # Si l'utilisateur est l'entrepreneur/créateur du projet, montrer toutes les tâches
+        project = Project.query.get(cv_project.project_id)
+        if user and user.role == 'businessman' and project and project.creator_id == user_id:
+            user_tasks = Task.query.filter_by(project_id=cv_project.project_id).all()
+        else:
+            # Sinon, ne montrer que les tâches assignées à l'utilisateur
+            user_tasks = Task.query.filter_by(
+                project_id=cv_project.project_id,
+                assignee_id=user_id
+            ).all()
         
         project_dict['tasks'] = [task.to_dict() for task in user_tasks]
         cv_projects_list.append(project_dict)
@@ -80,10 +86,8 @@ def get_cv_projects():
             if project.id not in existing_project_ids:
                 team_size = db.session.query(project_members).filter_by(project_id=project.id).count()
                 
-                user_tasks = Task.query.filter_by(
-                    project_id=project.id,
-                    assignee_id=user_id
-                ).all()
+                # Pour les entrepreneurs/créateurs, récupérer TOUTES les tâches du projet
+                user_tasks = Task.query.filter_by(project_id=project.id).all()
                 
                 created_cv_project = {
                     'id': f"created_{project.id}",
@@ -119,11 +123,16 @@ def get_user_cv_projects(user_id):
     for cv_project in cv_projects:
         project_dict = cv_project.to_dict()
         
-        # Récupérer les tâches assignées à l'utilisateur pour ce projet
-        user_tasks = Task.query.filter_by(
-            project_id=cv_project.project_id,
-            assignee_id=user_id
-        ).all()
+        # Si l'utilisateur est l'entrepreneur/créateur du projet, montrer toutes les tâches
+        project = Project.query.get(cv_project.project_id)
+        if user and user.role == 'businessman' and project and project.creator_id == user_id:
+            user_tasks = Task.query.filter_by(project_id=cv_project.project_id).all()
+        else:
+            # Sinon, ne montrer que les tâches assignées à l'utilisateur
+            user_tasks = Task.query.filter_by(
+                project_id=cv_project.project_id,
+                assignee_id=user_id
+            ).all()
         
         project_dict['tasks'] = [task.to_dict() for task in user_tasks]
         cv_projects_list.append(project_dict)
@@ -140,11 +149,8 @@ def get_user_cv_projects(user_id):
                 # Calculer la taille de l'équipe
                 team_size = db.session.query(project_members).filter_by(project_id=project.id).count()
                 
-                # Récupérer les tâches assignées à l'entrepreneur pour ce projet
-                user_tasks = Task.query.filter_by(
-                    project_id=project.id,
-                    assignee_id=user_id
-                ).all()
+                # Pour les entrepreneurs/créateurs, récupérer TOUTES les tâches du projet
+                user_tasks = Task.query.filter_by(project_id=project.id).all()
                 
                 # Créer l'entrée CV pour le projet créé
                 created_cv_project = {
