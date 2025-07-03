@@ -17,6 +17,10 @@ from .school import School, SchoolToken, SchoolRegistrationToken
 # Import des modèles d'abonnement
 from .subscription import Subscription, Invoice
 
+# Import des modèles d'usage
+from .school_usage import SchoolUsage, SchoolInvoice
+
+
 # Export de tous les modèles pour maintenir la compatibilité
 __all__ = [
     'db', 'get_uuid',
@@ -24,5 +28,6 @@ __all__ = [
     'Project', 'project_members', 'Message', 'Task', 'CVProject', 'TaskValidation', 'SubTask', 'SubTaskValidation', 'TaskStudent',
     'FileDocument',
     'School', 'SchoolToken', 'SchoolRegistrationToken',
-    'Subscription', 'Invoice'
+    'Subscription', 'Invoice',
+    'SchoolUsage', 'SchoolInvoice'
 ] 
