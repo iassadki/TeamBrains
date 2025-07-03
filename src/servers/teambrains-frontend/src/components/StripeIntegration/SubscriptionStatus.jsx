@@ -80,12 +80,12 @@ const SubscriptionStatus = () => {
                             // Si le statut a changé, mettre à jour
                             const currentHasSubscription = subscription !== null;
                             if (currentHasSubscription !== data.has_subscription) {
-                                console.log(`🔄 Changement de statut détecté: ${currentHasSubscription} → ${data.has_subscription}`);
+                                console.log(`Changement de statut détecté: ${currentHasSubscription} → ${data.has_subscription}`);
                                 fetchSubscriptionStatus();
                             }
                         }
                     } catch (error) {
-                        console.log('⚠️ Erreur lors du polling:', error);
+                        console.log('Erreur lors du polling:', error);
                     }
                 }
             }, 30000); // 30 secondes
@@ -487,8 +487,8 @@ const SubscriptionStatus = () => {
                                             : 'text-yellow-800'
                                     }`}>
                                         {subscription.payment_failed_count >= 3 
-                                            ? '⚠️ Abonnement suspendu - Action requise'
-                                            : '⚠️ Échec de paiement détecté'
+                                            ? 'Abonnement suspendu - Action requise'
+                                            : 'Échec de paiement détecté'
                                         }
                                     </h3>
                                     <p className={`text-sm mt-1 ${
@@ -674,7 +674,7 @@ const SubscriptionStatus = () => {
                             {subscription.plan_type === 'school' && (
                                 <div className="bg-green-50 rounded-lg p-3 mb-3">
                                     <h4 className="text-sm font-medium text-green-800 mb-2">
-                                        🏫 Gestion École
+                                        Gestion École
                                     </h4>
                                     <button
                                         onClick={handleSyncStudentCount}
@@ -687,7 +687,7 @@ const SubscriptionStatus = () => {
                                                 Synchronisation...
                                             </div>
                                         ) : (
-                                            '🔄 Synchroniser le nombre d\'étudiants'
+                                            'Synchroniser le nombre d\'étudiants'
                                         )}
                                     </button>
                                     <div className="text-xs text-green-700 mt-1">
@@ -766,7 +766,7 @@ const SubscriptionStatus = () => {
                                         onClick={handleDiagnostic}
                                         className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
                                     >
-                                        🔍 Diagnostic Stripe
+                                        Diagnostic Stripe
                                     </button>
                                     
                                     <button
@@ -782,11 +782,11 @@ const SubscriptionStatus = () => {
                         {/* Message informatif pour les utilisateurs */}
                         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                             <p className="text-sm text-blue-700">
-                                ℹ️ Votre abonnement se synchronise automatiquement. En cas de problème, contactez le support.
+                                Votre abonnement se synchronise automatiquement. En cas de problème, contactez le support.
                             </p>
                             {(process.env.NODE_ENV === 'development' || window.location.search.includes('debug=true')) && (
                                 <p className="text-xs text-blue-600 mt-2">
-                                    🛠️ Mode debug activé - Boutons de synchronisation disponibles
+                                    Mode debug activé - Boutons de synchronisation disponibles
                                 </p>
                             )}
                         </div>
@@ -794,11 +794,11 @@ const SubscriptionStatus = () => {
                         {/* Affichage des informations de debug si disponibles */}
                         {subscription && subscription.debug_info && (
                             <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                                <h4 className="font-semibold text-blue-800 mb-2">🔍 Informations de debug :</h4>
+                                <h4 className="font-semibold text-blue-800 mb-2">Informations de debug :</h4>
                                 <div className="text-sm text-blue-700 space-y-1">
-                                    <div>Abonnement existe : {subscription.debug_info.subscription_exists ? '✅ Oui' : '❌ Non'}</div>
+                                    <div>Abonnement existe : {subscription.debug_info.subscription_exists ? 'Oui' : 'Non'}</div>
                                     <div>Statut : <span className="font-mono">{subscription.debug_info.status}</span></div>
-                                    <div>Actif : {subscription.debug_info.is_active ? '✅ Oui' : '❌ Non'}</div>
+                                    <div>Actif : {subscription.debug_info.is_active ? 'Oui' : 'Non'}</div>
                                 </div>
                             </div>
                         )}
@@ -807,7 +807,7 @@ const SubscriptionStatus = () => {
             {showDiagnostic && diagnosticData && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto mx-4">
-                        <h3 className="text-lg font-bold mb-4">🔍 Diagnostic Stripe</h3>
+                        <h3 className="text-lg font-bold mb-4">Diagnostic Stripe</h3>
                         
                         <div className="space-y-4">
                             {/* Status de configuration */}

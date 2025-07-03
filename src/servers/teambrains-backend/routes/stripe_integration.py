@@ -302,12 +302,12 @@ def handle_checkout_session_completed(session):
                 
                 user = User.query.get(user_id)
                 if user:
-                    logging.info(f"✅ Utilisateur trouvé via métadonnées: {user.id} ({user.email})")
+                    logging.info(f"Utilisateur trouvé via métadonnées: {user.id} ({user.email})")
                 else:
-                    logging.warning(f"⚠️ User ID {user_id} des métadonnées non trouvé en base")
+                    logging.warning(f"User ID {user_id} des métadonnées non trouvé en base")
                     user_id = None
             except (ValueError, TypeError):
-                logging.error(f"❌ User ID invalide dans métadonnées: {user_id_str}")
+                logging.error(f"User ID invalide dans métadonnées: {user_id_str}")
                 user_id = None
         
         # 2. Si pas trouvé, rechercher par customer email
@@ -322,16 +322,16 @@ def handle_checkout_session_completed(session):
                     user = User.query.filter_by(email=customer_email).first()
                     if user:
                         user_id = user.id
-                        logging.info(f"✅ Utilisateur trouvé via customer email: {user.id} ({user.email})")
+                        logging.info(f"Utilisateur trouvé via customer email: {user.id} ({user.email})")
                     else:
-                        logging.error(f"❌ Aucun utilisateur trouvé pour email: {customer_email}")
+                        logging.error(f"Aucun utilisateur trouvé pour email: {customer_email}")
                         return
                         
                 except stripe.error.StripeError as e:
-                    logging.error(f"❌ Erreur récupération customer {customer_id}: {str(e)}")
+                    logging.error(f"Erreur récupération customer {customer_id}: {str(e)}")
                     return
             else:
-                logging.error("❌ Pas de customer_id disponible")
+                logging.error("Pas de customer_id disponible")
                 return
         
         # 3. Si toujours pas trouvé, essayer par abonnement existant
@@ -341,10 +341,10 @@ def handle_checkout_session_completed(session):
                 user = User.query.get(existing_subscription.user_id)
                 if user:
                     user_id = user.id
-                    logging.info(f"✅ Utilisateur trouvé via abonnement existant: {user.id} ({user.email})")
+                    logging.info(f"Utilisateur trouvé via abonnement existant: {user.id} ({user.email})")
         
         if not user or not user_id:
-            logging.error("❌ IMPOSSIBLE DE TROUVER L'UTILISATEUR - Session abandonnée")
+            logging.error("IMPOSSIBLE DE TROUVER L'UTILISATEUR - Session abandonnée")
             return
         
         # Récupérer les métadonnées ou les déduire
@@ -355,12 +355,12 @@ def handle_checkout_session_completed(session):
         
         # Vérifier si la session a une subscription
         if not session.get('subscription'):
-            logging.warning("⚠️ Session sans subscription ID")
+            logging.warning("Session sans subscription ID")
             return
         
         # Récupérer la subscription Stripe
         stripe_subscription = stripe.Subscription.retrieve(session['subscription'])
-        logging.info(f"📊 Stripe subscription: {stripe_subscription.id}, status: {stripe_subscription.status}")
+        logging.info(f"Stripe subscription: {stripe_subscription.id}, status: {stripe_subscription.status}")
         
         # Vérifier si l'abonnement existe déjà par stripe_subscription_id (gestion des doublons)
         subscription = Subscription.query.filter_by(
@@ -369,7 +369,7 @@ def handle_checkout_session_completed(session):
         
         if subscription:
             # Abonnement existe déjà, on met à jour
-            logging.info(f"🔄 Abonnement Stripe existant détecté: {stripe_subscription.id}, mise à jour")
+            logging.info(f"Abonnement Stripe existant détecté: {stripe_subscription.id}, mise à jour")
             action = "mis à jour"
             
             # Mettre à jour les informations
@@ -379,7 +379,7 @@ def handle_checkout_session_completed(session):
             subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
         else:
             # Créer un nouvel abonnement
-            logging.info(f"➕ Création nouvel abonnement pour user {user_id}")
+            logging.info(f"Création nouvel abonnement pour user {user_id}")
             action = "créé"
             
             subscription = Subscription()
@@ -409,25 +409,25 @@ def handle_checkout_session_completed(session):
                 student_monthly = (subscription.current_student_count or 0) * subscription.student_price_per_month
                 subscription.total_monthly_amount = base_monthly + student_monthly
                 
-                logging.info(f"🏫 École hybride configurée: {subscription.current_student_count} étudiants, {subscription.total_monthly_amount/100}€/mois")
+                logging.info(f"École hybride configurée: {subscription.current_student_count} étudiants, {subscription.total_monthly_amount/100}€/mois")
             
             elif plan_type == 'school_partnership':
                 # Plan partenariat : 5€ par étudiant/mois
                 subscription.student_price_per_month = 500  # 5€ en centimes
                 subscription.total_monthly_amount = (subscription.current_student_count or 1) * 500
                 
-                logging.info(f"🏫 École partenariat configurée: {subscription.current_student_count} étudiants, {subscription.total_monthly_amount/100}€/mois")
+                logging.info(f"École partenariat configurée: {subscription.current_student_count} étudiants, {subscription.total_monthly_amount/100}€/mois")
         
         if action == "créé":
             db.session.add(subscription)
         
         db.session.commit()
         
-        logging.info(f"✅ WEBHOOK SUCCESS: Abonnement {action} pour l'utilisateur {user_id} ({user.email}) - Plan: {plan_type}")
+        logging.info(f"WEBHOOK SUCCESS: Abonnement {action} pour l'utilisateur {user_id} ({user.email}) - Plan: {plan_type}")
         
     except Exception as e:
         db.session.rollback()
-        logging.error(f"❌ WEBHOOK ERROR - Checkout session: {str(e)}")
+        logging.error(f"WEBHOOK ERROR - Checkout session: {str(e)}")
         logging.error(f"Session data: {session}")
         import traceback
         logging.error(f"Traceback: {traceback.format_exc()}")
@@ -525,13 +525,13 @@ def handle_subscription_deleted(subscription):
             db_subscription.unpaid_invoice_id = None
             db.session.commit()
             
-            logging.info(f"✅ WEBHOOK SUCCESS: Abonnement annulé - User: {db_subscription.user_id}, Status: {old_status} → canceled")
+            logging.info(f"WEBHOOK SUCCESS: Abonnement annulé - User: {db_subscription.user_id}, Status: {old_status} → canceled")
         else:
-            logging.warning(f"⚠️ WEBHOOK: Abonnement {subscription['id']} non trouvé en base pour annulation")
+            logging.warning(f"WEBHOOK: Abonnement {subscription['id']} non trouvé en base pour annulation")
         
     except Exception as e:
         db.session.rollback()
-        logging.error(f"❌ WEBHOOK ERROR - Subscription deletion: {str(e)}")
+        logging.error(f"WEBHOOK ERROR - Subscription deletion: {str(e)}")
         logging.error(f"Subscription data: {subscription}")
 
 def handle_invoice_payment_failed(invoice):
@@ -642,7 +642,7 @@ def get_subscription_status():
         })
         
     except Exception as e:
-        logging.error(f"❌ Erreur récupération statut: {str(e)}")
+        logging.error(f"Erreur récupération statut: {str(e)}")
         return jsonify({'error': 'Erreur serveur'}), 500
 
 @stripe_bp.route('/invoices', methods=['GET'])

@@ -17,7 +17,6 @@ import ProjectDetail from './components/ProjectDetail';
 import AdminPanel from './components/Admins/AdminPanel';
 import AccessDenied from './components/AccessDenied';
 import Contact from './components/Contact';
-import OldSchoolDashboard from './components/SchoolDashboard/SchoolDashboard';
 import SubscriptionStatus from './components/StripeIntegration/SubscriptionStatus';
 import InvoiceList from './components/StripeIntegration/InvoiceList';
 import Modal from './components/Modal';
@@ -56,7 +55,6 @@ const AppContent = () => {
                             <Route path="/projets" element={<Projects />} />
                             <Route path="/contact" element={<Contact />} />
 
-                            <Route path="/ecole" element={<OldSchoolDashboard />} />
                             <Route path="/dashboard/subscription" element={<PrivateRoute><SubscriptionStatus /></PrivateRoute>} />
                             <Route path="/dashboard/invoices" element={<PrivateRoute><InvoiceList /></PrivateRoute>} />
                             

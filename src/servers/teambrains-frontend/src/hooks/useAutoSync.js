@@ -46,7 +46,7 @@ export const useAutoSync = (isEnabled = true, onSyncComplete = null, interval = 
                 }
             }
         } catch (error) {
-            console.log('⚠️ Erreur auto-sync:', error);
+            console.log('Erreur auto-sync:', error);
         } finally {
             syncInProgressRef.current = false;
         }
