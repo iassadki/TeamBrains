@@ -8,6 +8,7 @@ import os
 import sys
 from datetime import datetime, timedelta
 from sqlalchemy import text
+import random
 
 # Ajouter le répertoire courant au path pour les imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +26,24 @@ bcrypt = Bcrypt(app)
 
 def hash_pwd(pwd):
     return bcrypt.generate_password_hash(pwd).decode('utf-8')
+
+# Technologies par type (depuis StepFour.jsx)
+technologies = {
+    'FrontEnd': ["HTML", "CSS", "JavaScript", "React", "Vue"],
+    'BackEnd': ["Node.js", "Python", "Java", "PHP", "Ruby", "MongoDB", "SQL"],
+    'FullStack': ["HTML", "CSS", "JavaScript", "Node.js", "React", "MongoDB", "SQL", "Ruby", "PHP", "Java", "Python", "Vue"],
+    'Designer': ["Figma", "Sketch", "Adobe XD", "Photoshop", "Illustrator"],
+}
+valid_types = ['FrontEnd', 'BackEnd', 'FullStack', 'Designer']
+
+def random_type_and_techs(type_hint=None):
+    """Retourne un typeDeveloppeur et une liste de technos cohérente (sous forme de string)"""
+    if type_hint in valid_types:
+        t = type_hint
+    else:
+        t = random.choice(valid_types)
+    techs = random.sample(technologies[t], k=min(2, len(technologies[t])))
+    return t, ','.join(techs)
 
 def seed_database():
     """Insère le jeu de données complet dans la base"""
@@ -66,17 +85,26 @@ def seed_database():
             # Utilisateurs
             users = [
                 User(id="u1", role="student", nom="Dupont", prenom="Alice", 
-                     email="alice@polytechnique.fr", password=hash_pwd("alice123"), school_id=1),
+                     email="alice@polytechnique.fr", password=hash_pwd("alice123"), school_id=1, 
+                     typeDeveloppeur="FrontEnd", technologies=','.join(technologies['FrontEnd'])),
                 User(id="u2", role="student", nom="Martin", prenom="Bob", 
-                     email="bob@polytechnique.fr", password=hash_pwd("bob123"), school_id=1),
+                     email="bob@polytechnique.fr", password=hash_pwd("bob123"), school_id=1, 
+                     typeDeveloppeur="BackEnd", technologies=','.join(technologies['BackEnd'])),
                 User(id="u3", role="student", nom="Durand", prenom="Chloé", 
-                     email="chloe@hec.fr", password=hash_pwd("chloe123"), school_id=2),
+                     email="chloe@hec.fr", password=hash_pwd("chloe123"), school_id=2, 
+                     typeDeveloppeur="FullStack", technologies=','.join(technologies['FullStack'])),
                 User(id="u4", role="admin", nom="Admin", prenom="Super", 
-                     email="admin@teambrains.fr", password=hash_pwd("admin123"), school_id=None),
+                     email="admin@teambrains.fr", password=hash_pwd("admin123"), school_id=None, 
+                     typeDeveloppeur=None, technologies=None),
                 User(id="u5", role="school_admin", nom="Admin", prenom="Polytechnique", 
-                     email="admin.polytechnique@polytechnique.fr", password=hash_pwd("polytech123"), school_id=1),
+                     email="admin.polytechnique@polytechnique.fr", password=hash_pwd("polytech123"), school_id=1, 
+                     typeDeveloppeur="Designer", technologies=','.join(technologies['Designer'])),
                 User(id="u6", role="school_admin", nom="Admin", prenom="HEC", 
-                     email="admin.hec@hec.fr", password=hash_pwd("hec123"), school_id=2)
+                     email="admin.hec@hec.fr", password=hash_pwd("hec123"), school_id=2, 
+                     typeDeveloppeur="BackEnd", technologies=','.join(technologies['BackEnd'])),
+                User(id="u7", role="entrepreneur", nom="Lemoine", prenom="Paul", 
+                     email="paul.lemoine@entrepreneurs.com", password=hash_pwd("paul123"), school_id=None, 
+                     typeDeveloppeur="FullStack", technologies=','.join(technologies['FullStack'])),
             ]
             
             db.session.add_all(users)
@@ -90,6 +118,8 @@ def seed_database():
                 Skill(id=2, name="React", category="frontend", description="Développement React", 
                       created_at=datetime.utcnow(), is_active=True),
                 Skill(id=3, name="SQL", category="database", description="Gestion de base de données", 
+                      created_at=datetime.utcnow(), is_active=True),
+                Skill(id=4, name="Full Stack", category="fullstack", description="Développement Full Stack", 
                       created_at=datetime.utcnow(), is_active=True)
             ]
             
@@ -100,31 +130,40 @@ def seed_database():
             # UserSkill
             user_skills = [
                 UserSkill(user_id="u1", skill_id=1, level="avancé", acquired_date=datetime.utcnow(), last_updated=datetime.utcnow()),
+                UserSkill(user_id="u1", skill_id=2, level="avancé", acquired_date=datetime.utcnow(), last_updated=datetime.utcnow()),
                 UserSkill(user_id="u2", skill_id=2, level="débutant", acquired_date=datetime.utcnow(), last_updated=datetime.utcnow()),
-                UserSkill(user_id="u3", skill_id=3, level="intermédiaire", acquired_date=datetime.utcnow(), last_updated=datetime.utcnow())
+                UserSkill(user_id="u3", skill_id=3, level="intermédiaire", acquired_date=datetime.utcnow(), last_updated=datetime.utcnow()),
+                UserSkill(user_id="u3", skill_id=4, level="avancé", acquired_date=datetime.utcnow(), last_updated=datetime.utcnow()),
+                UserSkill(user_id="u7", skill_id=1, level="débutant", acquired_date=datetime.utcnow(), last_updated=datetime.utcnow())
             ]
             
             db.session.add_all(user_skills)
             db.session.commit()
             
             print("📋 Création des projets...")
-            # Projets
+            # Projets créés par l'entrepreneur (non lancés)
             projects = [
                 Project(id=1, name="Projet IA", project_slug="projet-ia", creation_date=datetime.utcnow(), 
-                       status="en cours", description="Projet d'intelligence artificielle", creator_id="u1", progress=50),
+                       status="brouillon", description="Projet d'intelligence artificielle", creator_id="u7", progress=0),
                 Project(id=2, name="Plateforme Web", project_slug="plateforme-web", creation_date=datetime.utcnow(), 
-                       status="terminé", description="Développement d'une plateforme web", creator_id="u3", progress=100)
+                       status="brouillon", description="Développement d'une plateforme web", creator_id="u7", progress=0)
             ]
             
             db.session.add_all(projects)
             db.session.commit()
             
             print("👥 Ajout des membres de projet...")
-            # Membres de projet (via SQL direct pour la table d'association)
+            # Aucun membre pour les projets non lancés
+            # Pour lancer un projet, il faut au moins un full stack ou un front + un back
+            # Exemple de projet lancé :
+            launched_project = Project(id=3, name="Projet Data Science", project_slug="projet-ds", creation_date=datetime.utcnow(), 
+                       status="en cours", description="Projet Data Science lancé", creator_id="u7", progress=10)
+            db.session.add(launched_project)
+            db.session.commit()
+            # Membres : u1 (front), u3 (fullstack)
             db.session.execute(text("""
                 INSERT INTO project_members (project_id, user_id, role) VALUES 
-                (1, 'u1', 'chef'), (1, 'u2', 'membre'), 
-                (2, 'u3', 'chef'), (2, 'u4', 'mentor')
+                (3, 'u1', 'front'), (3, 'u3', 'fullstack'), (3, 'u7', 'entrepreneur')
             """))
             db.session.commit()
             
@@ -133,10 +172,10 @@ def seed_database():
             tasks = [
                 Task(id=1, title="Collecte de données", description="Rassembler les datasets", 
                      due_date=datetime.utcnow() + timedelta(days=7), percent_completion=20, 
-                     assignee_id="u2", project_id=1, priority="haute", sprint="Sprint 1"),
+                     assignee_id="u1", project_id=3, priority="haute", sprint="Sprint 1"),
                 Task(id=2, title="Déploiement", description="Déployer sur le cloud", 
                      due_date=datetime.utcnow() + timedelta(days=14), percent_completion=100, 
-                     assignee_id="u3", project_id=2, priority="moyenne", sprint="Sprint 2")
+                     assignee_id="u3", project_id=3, priority="moyenne", sprint="Sprint 2")
             ]
             
             db.session.add_all(tasks)
@@ -147,10 +186,10 @@ def seed_database():
             subtasks = [
                 SubTask(id=1, title="Télécharger dataset", description="Télécharger depuis Kaggle", 
                        due_date=datetime.utcnow() + timedelta(days=2), percent_completion=100, 
-                       priority="haute", status="done", task_id=1, assigned_student_id="u2", created_date=datetime.utcnow()),
+                       priority="haute", status="done", task_id=1, assigned_student_id="u1", created_date=datetime.utcnow()),
                 SubTask(id=2, title="Nettoyer données", description="Supprimer les valeurs manquantes", 
                        due_date=datetime.utcnow() + timedelta(days=4), percent_completion=0, 
-                       priority="moyenne", status="pending", task_id=1, assigned_student_id="u1", created_date=datetime.utcnow())
+                       priority="moyenne", status="pending", task_id=1, assigned_student_id="u3", created_date=datetime.utcnow())
             ]
             
             db.session.add_all(subtasks)
@@ -174,7 +213,7 @@ def seed_database():
             print("👨‍🎓 Attribution des tâches aux étudiants...")
             # Attribution tâche-étudiant
             task_students = [
-                TaskStudent(id=1, task_id=1, student_id="u2", role="développeur", assigned_date=datetime.utcnow())
+                TaskStudent(id=1, task_id=1, student_id="u1", role="développeur", assigned_date=datetime.utcnow())
             ]
             
             db.session.add_all(task_students)
@@ -183,9 +222,9 @@ def seed_database():
             print("💬 Création des messages...")
             # Messages
             messages = [
-                Message(id=1, content="Bienvenue sur le projet IA !", project_id=1, 
-                       sender_id="u1", timestamp=datetime.utcnow()),
-                Message(id=2, content="Déploiement terminé.", project_id=2, 
+                Message(id=1, content="Bienvenue sur le projet Data Science !", project_id=3, 
+                       sender_id="u7", timestamp=datetime.utcnow()),
+                Message(id=2, content="Déploiement terminé.", project_id=3, 
                        sender_id="u3", timestamp=datetime.utcnow())
             ]
             
@@ -197,7 +236,7 @@ def seed_database():
             files = [
                 FileDocument(id=1, filename="dataset.csv", original_filename="dataset.csv", 
                            file_path="/files/dataset.csv", file_size=2048, file_type="csv", 
-                           upload_date=datetime.utcnow(), uploader_id="u2", project_id=1)
+                           upload_date=datetime.utcnow(), uploader_id="u1", project_id=3)
             ]
             
             db.session.add_all(files)
@@ -216,18 +255,22 @@ def seed_database():
             print("📄 Création des projets CV...")
             # CVProject
             cv_projects = [
-                CVProject(id=1, user_id="u1", project_id=1, role="Chef de projet", 
+                CVProject(id=1, user_id="u1", project_id=3, role="Chef de projet", 
                          start_date=datetime.utcnow() - timedelta(days=30), end_date=datetime.utcnow(), 
-                         team_size=2, description="Pilotage du projet IA")
+                         team_size=2, description="Pilotage du projet Data Science")
             ]
             
             db.session.add_all(cv_projects)
             db.session.commit()
             
             print("🎫 Création des tokens d'école...")
-            # Tokens écoles
+            # Tokens écoles (1 token = 1 étudiant)
             school_tokens = [
-                SchoolToken(id=1, school_id=1, token="TOKEN123", name="Token principal", 
+                SchoolToken(id=1, school_id=1, token="TOKENALICE", name="Token Alice", 
+                           created_at=datetime.utcnow(), is_active=True),
+                SchoolToken(id=2, school_id=1, token="TOKENBOB", name="Token Bob", 
+                           created_at=datetime.utcnow(), is_active=True),
+                SchoolToken(id=3, school_id=2, token="TOKENCHLOE", name="Token Chloé", 
                            created_at=datetime.utcnow(), is_active=True)
             ]
             
@@ -235,10 +278,14 @@ def seed_database():
             db.session.commit()
             
             print("🎓 Création des tokens d'inscription...")
-            # Tokens d'inscription
+            # Tokens d'inscription (1 token = 1 étudiant)
             registration_tokens = [
-                SchoolRegistrationToken(id=1, school_id=1, token="REG2024", name="Promo 2024", 
-                                       max_uses=100, current_uses=10, created_at=datetime.utcnow(), is_active=True)
+                SchoolRegistrationToken(id=1, school_id=1, token="REGALICE", name="Token Alice", 
+                                       max_uses=1, current_uses=0, created_at=datetime.utcnow(), is_active=True, created_by="u5"),
+                SchoolRegistrationToken(id=2, school_id=1, token="REGBOB", name="Token Bob", 
+                                       max_uses=1, current_uses=0, created_at=datetime.utcnow(), is_active=True, created_by="u5"),
+                SchoolRegistrationToken(id=3, school_id=2, token="REGCHLOE", name="Token Chloé", 
+                                       max_uses=1, current_uses=0, created_at=datetime.utcnow(), is_active=True, created_by="u6")
             ]
             
             db.session.add_all(registration_tokens)
@@ -289,7 +336,7 @@ def seed_database():
             db.session.commit()
             
             print("✅ Seeding terminé avec succès !")
-            print(f"📊 Données créées : {len(users)} utilisateurs, {len(projects)} projets, {len(tasks)} tâches")
+            print(f"📊 Données créées : {len(users)} utilisateurs, {len(projects)+1} projets, {len(tasks)} tâches")
             
     except Exception as e:
         print(f"❌ Erreur lors du seeding : {e}")
