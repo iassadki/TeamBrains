@@ -110,12 +110,6 @@ const NavBar = () => {
                                         Profil
                                     </NavLink>
                                     <div className="border-t border-gray-100 my-1"></div>
-                                    <NavLink to="/dashboard/subscription" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                        Mon Abonnement
-                                    </NavLink>
-                                    <NavLink to="/dashboard/invoices" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                        Mes Factures
-                                    </NavLink>
                                     {currentUser.role === "admin" && (
                                         <>
                                             <div className="border-t border-gray-100 my-1"></div>

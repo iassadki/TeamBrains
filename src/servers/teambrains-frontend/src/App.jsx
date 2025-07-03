@@ -54,9 +54,6 @@ const AppContent = () => {
                             <Route path="/users/profile/:userId" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
                             <Route path="/projets" element={<Projects />} />
                             <Route path="/contact" element={<Contact />} />
-
-                            <Route path="/dashboard/subscription" element={<PrivateRoute><SubscriptionStatus /></PrivateRoute>} />
-                            <Route path="/dashboard/invoices" element={<PrivateRoute><InvoiceList /></PrivateRoute>} />
                             
                             {/* Routes de l'espace partenariat écoles */}
                             <Route path="/partenariat-ecole" element={<PartnershipHome />} />
