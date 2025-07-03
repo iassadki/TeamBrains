@@ -36,6 +36,7 @@ services:
       POSTGRES_PASSWORD: teambrains
     volumes:
       - ../data/db/pgdata:/var/lib/postgresql/data
+      - ./infrastructure/db-init/:/docker-entrypoint-initdb.d/
     ports:
       - "5432:5432"
     networks:

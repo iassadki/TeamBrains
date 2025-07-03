@@ -3,13 +3,28 @@
 ## Site Web
 (soon)
 
+## Jeu de données de test
+
+Lors du premier lancement, la base de données est automatiquement remplie avec un jeu de données complet. Vous pouvez vous connecter avec les identifiants suivants :
+
+| Rôle              | Email                                 | Mot de passe    |
+|-------------------|---------------------------------------|-----------------|
+| Étudiant          | alice@polytechnique.fr                | alice123        |
+| Étudiant          | bob@polytechnique.fr                  | bob123          |
+| Étudiant          | chloe@hec.fr                          | chloe123        |
+| Admin plateforme  | admin@teambrains.fr                   | admin123        |
+| Admin école       | admin.polytechnique@polytechnique.fr  | polytech123     |
+| Admin école       | admin.hec@hec.fr                      | hec123          |
+
+Vous pouvez utiliser ces comptes pour tester toutes les fonctionnalités de la plateforme (connexion, gestion de projet, espace école, etc.).
+
 ## Concept & Problématiques
-### L’Entrepreneur
+### L'Entrepreneur
 - **Défis**: Obstacles techniques et financiers, difficulté à trouver un associé approprié.
 - **Solution**: Collaboration avec des étudiants en informatique désireux d'acquérir de l'expérience et de relever des défis, sans rémunération.
 - **Objectif**: Créer un prototype, une version test ou une maquette pour faciliter la présentation à des partenaires et investisseurs potentiels.
 
-### L’Étudiant
+### L'Étudiant
 - **Ambition**: Acquérir de l'expérience cruciale pour la réussite professionnelle.
 - **Opportunité**: Contribuer à des projets informatiques de grande envergure et acquérir de l'expérience.
 - **Flexibilité**: Participation sans contraintes de statut salarié, freelance ou projet d'étude.
@@ -18,7 +33,7 @@
 La plateforme est dédiée exclusivement aux projets informatiques et digitaux, y compris les sites web, applications mobiles, logiciels, design, gestion de données, intelligence artificielle, machine learning, cybersécurité, systèmes d'information, et robotique.
 
 ## Fonctionnement
-1. **Inscription**: En tant qu’entrepreneur ou étudiant/junior.
+1. **Inscription**: En tant qu'entrepreneur ou étudiant/junior.
 2. **Profil**: Remplir les informations de profil, incluant compétences et technologies pour les étudiants (langages, frameworks, bases de données).
 3. **Publication des Projets**: Visibles en entier par les étudiants. Entrepreneurs voient une version minimale, sauf pour leurs propres projets.
 4. **Inscription aux Projets**: Étudiants peuvent s'inscrire aux projets.
@@ -32,37 +47,54 @@ La plateforme est dédiée exclusivement aux projets informatiques et digitaux, 
 ## Note
 TeamBrains vise à créer un écosystème où la passion pour l'informatique et l'ambition entrepreneuriale se rencontrent pour transformer les idées en réalités tangibles, en favorisant une expérience enrichissante pour tous les participants. Rejoignez-nous pour bâtir l'avenir !
 
-# Déploiement du projet
-Cette partie a pour but de guider étape par étape l’utilisateur sur le processus de build et déploiement du projet TeamBrains.
+# Guide de Déploiement TeamBrains
 
-Avant de commencer l'installation de notre plateforme, assurez-vous que disposez de Docker Desktop installé sur votre machine.
+## 1. Lancement de l'application avec Docker
 
-Voici les étapes à suivre pour déployer notre plateforme sur votre système :
+```bash
+docker-compose -f infrastructure/compose.yaml up --build
+```
 
-## Étape 1 : Ouvrir le terminal
-Ouvrez votre terminal. Sur Windows, vous pouvez utiliser PowerShell ou l'invite de commandes. Sur MacOS et Linux, vous pouvez utiliser le terminal intégré.
+- Cette commande lance tous les services (backend, frontend, base de données, etc.)
+- **Environnement de développement frontend** :
+  1. Arrête le conteneur frontend (par exemple via Docker Desktop ou `docker-compose stop frontend`)
+  2. Va dans le dossier du frontend :
+     ```bash
+     cd src/servers/teambrains-frontend
+     npm install
+     npm run dev
+     ```
+  3. Le frontend sera accessible sur [http://localhost:5173](http://localhost:5173) avec hot reload.
 
-## Étape 2 : Se placer dans le répertoire cible
-Naviguez jusqu'au répertoire dans lequel vous souhaitez cloner le projet. Utilisez la commande cd (change directory) pour cela. Par exemple, si vous souhaitez placer le projet dans un répertoire nommé "MonProjet" sur le bureau, vous écririez :
-```cd ~/Desktop/MonProjet```
+## 2. Installation de Stripe CLI (pour le développement)
 
-## Étape 3: Cloner le projet
-Vous pouvez maintenant cloner le projet à partir du dépôt GitHub. Utilisez la commande git clone pour cela :
-```git clone https://github.com/iassadki/TeamBrains.git```
+Stripe CLI permet de simuler des webhooks et de tester l'intégration Stripe localement.
 
-Ceci clonera le projet dans le répertoire "MonProjet".
+- **Installation (macOS/Linux)** :
+  ```bash
+  brew install stripe/stripe-cli/stripe
+  # ou
+  npm install -g stripe
+  ```
+- **Installation (Windows)** :
+  Télécharger depuis : https://stripe.com/docs/stripe-cli#install
 
-## Étape 4: Lancer l'application avec Docker
+## 3. Lancement de Stripe CLI (webhooks)
 
-Naviguez jusqu'au répertoire **"/infrastructure"**. Maintenant, vous pouvez lancer la plateforme avec Docker. Utilisez la commande docker pour construire et démarrer les services de votre application : ```docker-compose up --build```
+Pour recevoir les webhooks Stripe dans votre backend local :
 
-Le build peut durer quelques minutes en fonction de votre connexion internet.
+```bash
+stripe listen --forward-to localhost:5001/webhook/stripe
+```
 
-Veuillez noter que chaque étape suppose que vous êtes dans le répertoire du projet après avoir cloné le dépôt. Si vous rencontrez des erreurs, assurez-vous que vous êtes dans le bon répertoire avant d'exécuter chaque commande.
+- Cette commande va écouter les événements Stripe et les rediriger vers votre backend Flask.
+- Le terminal affichera une clé secrète de webhook à copier dans vos variables d'environnement (`STRIPE_WEBHOOK_SECRET`).
 
-Une fois le build terminé, vous devriez voir vos 3 conteneurs tourner sur Docker Dekstop.
-Si c’est le cas, félicitation le projet doit maintenant être en cours d'exécution sur votre système et vous devriez pouvoir y accéder via l’url suivante sur le navigateur de votre ordinateur : 
+---
 
-```localhost```
+**Résumé** :
+- Docker pour tout lancer rapidement
+- Frontend en mode dev pour le hot reload
+- Stripe CLI pour simuler les paiements et webhooks
 
-Et le projet est lancé !
+Pour toute question, consultez la documentation interne ou contactez l'équipe TeamBrains !

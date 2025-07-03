@@ -1,4 +1,4 @@
-from extensions import db
+from models import db
 from datetime import datetime, date
 from sqlalchemy import func
 
@@ -9,7 +9,7 @@ class SchoolUsage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     
     # Relations
-    school_id = db.Column(db.Integer, db.ForeignKey('school.id'), nullable=False)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
     
     # Données d'usage
     usage_date = db.Column(db.Date, nullable=False, default=date.today)
@@ -118,7 +118,7 @@ class SchoolInvoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     
     # Relations
-    school_id = db.Column(db.Integer, db.ForeignKey('school.id'), nullable=False)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
     
     # Informations de facturation
     billing_year = db.Column(db.Integer, nullable=False)
