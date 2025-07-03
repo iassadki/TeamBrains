@@ -17,8 +17,6 @@ import ProjectDetail from './components/ProjectDetail';
 import AdminPanel from './components/Admins/AdminPanel';
 import AccessDenied from './components/AccessDenied';
 import Contact from './components/Contact';
-import SubscriptionStatus from './components/StripeIntegration/SubscriptionStatus';
-import InvoiceList from './components/StripeIntegration/InvoiceList';
 import Modal from './components/Modal';
 import PartnershipHome from './components/Partnership/PartnershipHome';
 import SchoolRegistration from './components/Partnership/SchoolRegistration';
