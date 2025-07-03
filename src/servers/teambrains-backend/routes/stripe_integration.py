@@ -19,6 +19,50 @@ STRIPE_PRICES = {
     'school': 'price_1RxxxxxxxxxxxxxxxxxxxxxxxxxxxxSchool'     # À remplacer par votre vrai price_id
 }
 
+def is_partnership_subscription(invoice_data):
+    """Détecter si une facture appartient à un abonnement partenariat"""
+    try:
+        # Récupérer l'ID de subscription
+        stripe_subscription_id = None
+        if invoice_data.get('subscription'):
+            stripe_subscription_id = invoice_data['subscription']
+        elif (invoice_data.get('parent') and 
+              invoice_data['parent'] is not None and 
+              invoice_data['parent'].get('subscription_details', {}).get('subscription')):
+            stripe_subscription_id = invoice_data['parent']['subscription_details']['subscription']
+        
+        if not stripe_subscription_id:
+            return False
+            
+        # Vérifier en base si c'est un abonnement partenariat
+        subscription = Subscription.query.filter_by(
+            stripe_subscription_id=stripe_subscription_id,
+            plan_type='school_partnership'
+        ).first()
+        
+        return subscription is not None
+    except Exception as e:
+        logging.error(f"Erreur détection abonnement partenariat: {str(e)}")
+        return False
+
+def is_partnership_subscription_direct(subscription_data):
+    """Détecter si un abonnement Stripe direct est un abonnement partenariat"""
+    try:
+        stripe_subscription_id = subscription_data.get('id')
+        if not stripe_subscription_id:
+            return False
+            
+        # Vérifier en base si c'est un abonnement partenariat
+        subscription = Subscription.query.filter_by(
+            stripe_subscription_id=stripe_subscription_id,
+            plan_type='school_partnership'
+        ).first()
+        
+        return subscription is not None
+    except Exception as e:
+        logging.error(f"Erreur détection abonnement partenariat direct: {str(e)}")
+        return False
+
 @stripe_bp.route('/create-checkout-session', methods=['POST'])
 @jwt_required()
 def create_checkout_session():
@@ -163,18 +207,66 @@ def stripe_webhook():
     logging.info(f"🎯 PROCESSING EVENT: {event_type}")
     
     try:
+        # Détecter si c'est un abonnement école partenariat et rediriger
         if event_type == 'checkout.session.completed':
-            handle_checkout_session_completed(event['data']['object'])
+            session_data = event['data']['object']
+            metadata = session_data.get('metadata', {})
+            plan_type = metadata.get('plan_type')
+            
+            if plan_type == 'school_partnership':
+                # Rediriger vers le gestionnaire partenariat
+                logging.info(f"🏫 REDIRECTING TO PARTNERSHIP: {event_type} for plan_type={plan_type}")
+                from routes.stripe_partnership import handle_partnership_checkout_completed
+                handle_partnership_checkout_completed(session_data)
+            else:
+                handle_checkout_session_completed(session_data)
+                
         elif event_type == 'invoice.payment_succeeded':
-            handle_invoice_payment_succeeded(event['data']['object'])
+            invoice_data = event['data']['object']
+            # Vérifier si c'est un abonnement partenariat
+            if is_partnership_subscription(invoice_data):
+                logging.info(f"🏫 REDIRECTING TO PARTNERSHIP: {event_type}")
+                from routes.stripe_partnership import handle_partnership_payment_succeeded
+                handle_partnership_payment_succeeded(invoice_data)
+            else:
+                handle_invoice_payment_succeeded(invoice_data)
+                
         elif event_type == 'invoice.payment_failed':
-            handle_invoice_payment_failed(event['data']['object'])
+            invoice_data = event['data']['object']
+            if is_partnership_subscription(invoice_data):
+                logging.info(f"🏫 REDIRECTING TO PARTNERSHIP: {event_type}")
+                from routes.stripe_partnership import handle_partnership_payment_failed
+                handle_partnership_payment_failed(invoice_data)
+            else:
+                handle_invoice_payment_failed(invoice_data)
+                
         elif event_type == 'customer.subscription.updated':
-            handle_subscription_updated(event['data']['object'])
+            subscription_data = event['data']['object']
+            if is_partnership_subscription_direct(subscription_data):
+                logging.info(f"🏫 REDIRECTING TO PARTNERSHIP: {event_type}")
+                from routes.stripe_partnership import handle_partnership_subscription_updated
+                handle_partnership_subscription_updated(subscription_data)
+            else:
+                handle_subscription_updated(subscription_data)
+                
         elif event_type == 'customer.subscription.deleted':
-            handle_subscription_deleted(event['data']['object'])
+            subscription_data = event['data']['object']
+            if is_partnership_subscription_direct(subscription_data):
+                logging.info(f"🏫 REDIRECTING TO PARTNERSHIP: {event_type}")
+                from routes.stripe_partnership import handle_partnership_subscription_deleted
+                handle_partnership_subscription_deleted(subscription_data)
+            else:
+                handle_subscription_deleted(subscription_data)
+                
         elif event_type == 'invoice.payment_action_required':
-            handle_payment_action_required(event['data']['object'])
+            invoice_data = event['data']['object']
+            if is_partnership_subscription(invoice_data):
+                logging.info(f"🏫 REDIRECTING TO PARTNERSHIP: {event_type}")
+                # Utiliser la même logique que pour payment_failed
+                from routes.stripe_partnership import handle_partnership_payment_failed
+                handle_partnership_payment_failed(invoice_data)
+            else:
+                handle_payment_action_required(invoice_data)
         else:
             logging.info(f"ℹ️ WEBHOOK IGNORED: Event type {event_type} not handled")
         
@@ -200,16 +292,22 @@ def handle_checkout_session_completed(session):
         
         # 1. Essayer avec les métadonnées directes
         if session.get('metadata') and session['metadata'].get('user_id'):
-            user_id = session['metadata']['user_id']
+            user_id_str = session['metadata']['user_id']
             try:
-                user_id = int(user_id)
+                # Gérer les UUID (string) et les IDs numériques
+                if user_id_str.isdigit():
+                    user_id = int(user_id_str)
+                else:
+                    user_id = user_id_str  # UUID string
+                
                 user = User.query.get(user_id)
                 if user:
                     logging.info(f"✅ Utilisateur trouvé via métadonnées: {user.id} ({user.email})")
                 else:
                     logging.warning(f"⚠️ User ID {user_id} des métadonnées non trouvé en base")
+                    user_id = None
             except (ValueError, TypeError):
-                logging.error(f"❌ User ID invalide dans métadonnées: {user_id}")
+                logging.error(f"❌ User ID invalide dans métadonnées: {user_id_str}")
                 user_id = None
         
         # 2. Si pas trouvé, rechercher par customer email
@@ -293,24 +391,32 @@ def handle_checkout_session_completed(session):
             subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
             subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
         
-        # Pour les abonnements école, ajouter les informations hybrides
-        if plan_type == 'school':
+        # Pour les abonnements école, ajouter les informations spécifiques
+        if plan_type in ['school', 'school_partnership']:
             if school_id and school_id.isdigit():
                 subscription.school_id = int(school_id)
             if student_count and student_count.isdigit():
                 subscription.current_student_count = int(student_count)
                 subscription.last_student_count_update = datetime.utcnow()
             
-            # Initialiser les montants par défaut
-            subscription.base_plan_amount = 12000  # 120€
-            subscription.student_price_per_month = 200  # 2€
+            if plan_type == 'school':
+                # Plan hybride : base + étudiants
+                subscription.base_plan_amount = 12000  # 120€
+                subscription.student_price_per_month = 200  # 2€
+                
+                # Calculer le montant total mensuel
+                base_monthly = subscription.base_plan_amount // 12  # 10€ par mois
+                student_monthly = (subscription.current_student_count or 0) * subscription.student_price_per_month
+                subscription.total_monthly_amount = base_monthly + student_monthly
+                
+                logging.info(f"🏫 École hybride configurée: {subscription.current_student_count} étudiants, {subscription.total_monthly_amount/100}€/mois")
             
-            # Calculer le montant total mensuel
-            base_monthly = subscription.base_plan_amount // 12  # 10€ par mois
-            student_monthly = (subscription.current_student_count or 0) * subscription.student_price_per_month
-            subscription.total_monthly_amount = base_monthly + student_monthly
-            
-            logging.info(f"🏫 École configurée: {subscription.current_student_count} étudiants, {subscription.total_monthly_amount/100}€/mois")
+            elif plan_type == 'school_partnership':
+                # Plan partenariat : 5€ par étudiant/mois
+                subscription.student_price_per_month = 500  # 5€ en centimes
+                subscription.total_monthly_amount = (subscription.current_student_count or 1) * 500
+                
+                logging.info(f"🏫 École partenariat configurée: {subscription.current_student_count} étudiants, {subscription.total_monthly_amount/100}€/mois")
         
         if action == "créé":
             db.session.add(subscription)
@@ -1421,7 +1527,9 @@ def force_sync_all_subscriptions():
                     # Si c'est un plan école, ajouter les infos école
                     if plan_type in ['school_partnership', 'school'] and customer.metadata.get('school_id'):
                         try:
-                            local_sub.school_id = int(customer.metadata['school_id'])
+                            school_id_str = customer.metadata['school_id']
+                            if school_id_str.isdigit():
+                                local_sub.school_id = int(school_id_str)
                         except (ValueError, TypeError):
                             pass
                 

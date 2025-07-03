@@ -196,15 +196,29 @@ def handle_partnership_checkout_completed(session):
         # 1. Essayer avec les métadonnées directes
         if session.get('metadata') and session['metadata'].get('user_id'):
             try:
-                user_id = int(session['metadata']['user_id'])
+                user_id_str = session['metadata']['user_id']
+                school_id_str = session['metadata'].get('school_id', '')
+                
+                # Gérer les UUID (string) et les IDs numériques
+                if user_id_str.isdigit():
+                    user_id = int(user_id_str)
+                else:
+                    user_id = user_id_str  # UUID string
+                
                 user = User.query.get(user_id)
                 if user:
                     logging.info(f"✅ Utilisateur trouvé via métadonnées: {user.id} ({user.email})")
-                    school_id = int(session['metadata'].get('school_id', 0)) or user.school_id
+                    
+                    # Traiter le school_id
+                    if school_id_str and school_id_str.isdigit():
+                        school_id = int(school_id_str)
+                    else:
+                        school_id = user.school_id
                 else:
                     logging.warning(f"⚠️ User ID {user_id} des métadonnées non trouvé en base")
-            except (ValueError, TypeError):
-                logging.error(f"❌ User/School ID invalide dans métadonnées")
+                    user_id = None
+            except (ValueError, TypeError) as e:
+                logging.error(f"❌ User/School ID invalide dans métadonnées: {str(e)}")
                 user_id = None
         
         # 2. Si pas trouvé, rechercher par customer email
