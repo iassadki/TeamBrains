@@ -12,6 +12,7 @@ Lors du premier lancement, la base de données est automatiquement remplie avec 
 | Étudiant          | alice@polytechnique.fr                | alice123        |
 | Étudiant          | bob@polytechnique.fr                  | bob123          |
 | Étudiant          | chloe@hec.fr                          | chloe123        |
+| Entrepreneur      | paul.lemoine@entrepreneurs.com        | paul123         |
 | Admin plateforme  | admin@teambrains.fr                   | admin123        |
 | Admin école       | admin.polytechnique@polytechnique.fr  | polytech123     |
 | Admin école       | admin.hec@hec.fr                      | hec123          |
