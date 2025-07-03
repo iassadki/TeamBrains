@@ -19,13 +19,25 @@ from routes.sprint import sprint_bp
 from routes.validation import validation_bp
 from routes.schools import schools_bp
 from routes.stripe_integration import stripe_bp
+from routes.school_partnership import school_partnership_bp
+from routes.stripe_partnership import stripe_partnership_bp
+from routes.search import search_bp
 from routes.subtasks import subtasks_bp
 from routes.skills import skills_bp
 from routes.visibility import visibility_bp
 
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
+
+# Configuration du logging avec fichier
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
 
 app = Flask(__name__)
 bcrypt.init_app(app)
@@ -44,12 +56,15 @@ app.register_blueprint(sprint_bp)
 app.register_blueprint(validation_bp)
 app.register_blueprint(schools_bp)
 app.register_blueprint(stripe_bp)
+app.register_blueprint(school_partnership_bp)
+app.register_blueprint(stripe_partnership_bp)
+app.register_blueprint(search_bp, url_prefix='/search')
 app.register_blueprint(subtasks_bp)
 app.register_blueprint(skills_bp)
 app.register_blueprint(visibility_bp)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
-app.config['JWT_SECRET_KEY'] = 'wdgQWWUKwT17lCz1'
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
 app.config['MAIL_SERVER'] = 'mailpit'
 app.config['MAIL_PORT'] = 1025
 app.config['MAIL_USE_TLS'] = False

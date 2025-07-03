@@ -125,26 +125,6 @@ def get_project_files(project_id):
         } for file in files]
     }), 200
 
-@upload_bp.route('/files/<int:file_id>', methods=['GET'])
-@jwt_required()
-def get_file_info(file_id):
-    file = FileDocument.query.get(file_id)
-    
-    if not file:
-        return jsonify({"error": "Le fichier spécifié n'existe pas"}), 404
-    
-    return jsonify({
-        "id": file.id,
-        "filename": file.original_filename,
-        "size": file.file_size,
-        "type": file.file_type,
-        "upload_date": file.upload_date.isoformat(),
-        "uploader_id": file.uploader_id,
-        "project_id": file.project_id,
-        "download_url": url_for('upload.download_file', file_id=file.id, _external=True),
-        "expiration_date": file.expiration_date.isoformat() if file.expiration_date else None
-    }), 200
-
 @upload_bp.route('/download/<int:file_id>', methods=['GET'])
 @jwt_required()
 def download_file(file_id):
@@ -168,46 +148,3 @@ def download_file(file_id):
         as_attachment=True,
         download_name=file.original_filename
     )
-
-@upload_bp.route('/files/<int:file_id>', methods=['DELETE'])
-@jwt_required()
-def delete_file(file_id):
-    current_user_id = get_jwt_identity()
-    file = FileDocument.query.get(file_id)
-    
-    if not file:
-        return jsonify({"error": "Le fichier spécifié n'existe pas"}), 404
-    
-    if file.uploader_id != current_user_id:
-        return jsonify({"error": "Vous n'êtes pas autorisé à supprimer ce fichier"}), 403
-    
-    try:
-        if os.path.exists(file.file_path):
-            os.remove(file.file_path)
-    except Exception as e:
-        return jsonify({"error": f"Erreur lors de la suppression du fichier: {str(e)}"}), 500
-    
-    db.session.delete(file)
-    db.session.commit()
-    
-    return jsonify({"message": "Fichier supprimé avec succès"}), 200
-
-@upload_bp.route('/renew/<int:file_id>', methods=['POST'])
-@jwt_required()
-def renew_link(file_id):
-    current_user_id = get_jwt_identity()
-    file = FileDocument.query.get(file_id)
-    
-    if not file:
-        return jsonify({"error": "Le fichier spécifié n'existe pas"}), 404
-    
-    if file.uploader_id != current_user_id:
-        return jsonify({"error": "Vous n'êtes pas autorisé à renouveler ce lien"}), 403
-    
-    file.expiration_date = datetime.datetime.utcnow() + datetime.timedelta(days=30)
-    db.session.commit()
-    
-    return jsonify({
-        "message": "Lien renouvelé avec succès",
-        "new_expiration_date": file.expiration_date.isoformat()
-    }), 200

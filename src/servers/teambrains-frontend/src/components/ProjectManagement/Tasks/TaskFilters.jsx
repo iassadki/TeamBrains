@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Filter, X, Edit2, Trash2, User, Calendar, Clock, Paperclip } from 'lucide-react';
+import { Filter, X, Edit2, Trash2, User, Calendar, Clock, Paperclip, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { format, parseISO, isToday, isThisWeek, isPast, isAfter, endOfWeek } from 'date-fns';
@@ -16,7 +16,6 @@ const TaskFilters = ({
     const [project, setProject] = useState(null);
     const [allTasks, setAllTasks] = useState([]);
     const [filteredTasks, setFilteredTasks] = useState([]);
-    const [availableSprints, setAvailableSprints] = useState([]);
     const [taskValidations, setTaskValidations] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -42,7 +41,7 @@ const TaskFilters = ({
         }
     }, [slug]);
 
-    // Récupération des tâches et des sprints
+    // Récupération des tâches
     useEffect(() => {
         const fetchData = async () => {
             if (project?.id) {
@@ -56,14 +55,6 @@ const TaskFilters = ({
                         }
                     });
                     setAllTasks(tasksResponse.data.tasks);
-
-                    // Récupération des sprints disponibles
-                    const sprintsResponse = await axios.get(`http://localhost:5001/sprint/${project.id}/list`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                        }
-                    });
-                    setAvailableSprints(sprintsResponse.data.sprints);
 
                     // Récupération des validations des tâches
                     const validationPromises = tasksResponse.data.tasks.map(task =>
@@ -105,23 +96,9 @@ const TaskFilters = ({
             filtered = filtered.filter(task => task.assignee_id === filters.assignee);
         }
 
-        // Filtre par sprint
-        if (filters.sprint) {
-            if (filters.sprint === 'current') {
-                // Pour le sprint actuel, on prend le sprint le plus récent ou le plus utilisé
-                const sprintCounts = {};
-                allTasks.forEach(task => {
-                    if (task.sprint) {
-                        sprintCounts[task.sprint] = (sprintCounts[task.sprint] || 0) + 1;
-                    }
-                });
-                const currentSprint = Object.keys(sprintCounts).sort((a, b) => sprintCounts[b] - sprintCounts[a])[0];
-                if (currentSprint) {
-                    filtered = filtered.filter(task => task.sprint === currentSprint);
-                }
-            } else {
-                filtered = filtered.filter(task => task.sprint === filters.sprint);
-            }
+        // Filtre par priorité
+        if (filters.priority) {
+            filtered = filtered.filter(task => task.priority === filters.priority);
         }
 
         // Filtre par statut
@@ -173,7 +150,7 @@ const TaskFilters = ({
             assignee: '',
             status: '',
             dueDate: '',
-            sprint: ''
+            priority: ''
         });
     };
 
@@ -215,12 +192,32 @@ const TaskFilters = ({
         }
     };
 
-    // Obtenir le nom du sprint affiché
-    const getSprintDisplayName = (sprintValue) => {
-        if (sprintValue === 'current') {
-            return 'Sprint actuel';
+    // Obtenir la couleur de la priorité
+    const getPriorityColor = (priority) => {
+        switch (priority) {
+            case 'haute':
+                return 'bg-red-100 text-red-800 border-red-200';
+            case 'moyenne':
+                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'basse':
+                return 'bg-green-100 text-green-800 border-green-200';
+            default:
+                return 'bg-gray-100 text-gray-800 border-gray-200';
         }
-        return sprintValue;
+    };
+
+    // Obtenir l'icône de la priorité
+    const getPriorityIcon = (priority) => {
+        switch (priority) {
+            case 'haute':
+                return '🔥';
+            case 'moyenne':
+                return '➡️';
+            case 'basse':
+                return '🔽';
+            default:
+                return '📋';
+        }
     };
 
     // Obtenir le statut de validation d'une tâche
@@ -269,7 +266,7 @@ const TaskFilters = ({
             </div>
 
             {/* Filtres */}
-            <div className={`${showFilters ? 'block' : 'hidden md:flex'} md:flex md:space-x-4 bg-white rounded-lg p-3 shadow-sm mb-6`}>
+            <div className={`${showFilters ? 'block' : 'hidden md:flex'} md:flex md:flex-wrap md:gap-4 bg-white rounded-lg p-3 shadow-sm mb-6`}>
                 <div className="mb-2 md:mb-0">
                     <label className="block text-xs font-medium text-gray-700 mb-1">Assigné à</label>
                     <select
@@ -287,19 +284,16 @@ const TaskFilters = ({
                 </div>
 
                 <div className="mb-2 md:mb-0">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Sprint</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Priorité</label>
                     <select
-                        value={filters.sprint}
-                        onChange={(e) => handleFilterChange('sprint', e.target.value)}
+                        value={filters.priority}
+                        onChange={(e) => handleFilterChange('priority', e.target.value)}
                         className="w-full md:w-auto text-sm p-1.5 border border-gray-300 rounded"
                     >
-                        <option value="">Tous les sprints</option>
-                        <option value="current">Voir le sprint actuel</option>
-                        {availableSprints.map(sprint => (
-                            <option key={sprint} value={sprint}>
-                                {sprint}
-                            </option>
-                        ))}
+                        <option value="">Toutes les priorités</option>
+                        <option value="haute">🔥 Haute</option>
+                        <option value="moyenne">➡️ Moyenne</option>
+                        <option value="basse">🔽 Basse</option>
                     </select>
                 </div>
 
@@ -349,7 +343,7 @@ const TaskFilters = ({
                         <Filter className="mr-2" size={18} />
                         Tâches filtrées ({filteredTasks.length})
                     </h3>
-                    {(filters.assignee || filters.status || filters.dueDate || filters.sprint) && (
+                    {(filters.assignee || filters.status || filters.dueDate || filters.priority) && (
                         <div className="mt-2 flex flex-wrap gap-2">
                             {filters.assignee && (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -357,10 +351,10 @@ const TaskFilters = ({
                                     Assigné: {getMemberName(filters.assignee)}
                                 </span>
                             )}
-                            {filters.sprint && (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                    <Clock size={12} className="mr-1" />
-                                    Sprint: {getSprintDisplayName(filters.sprint)}
+                            {filters.priority && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <AlertTriangle size={12} className="mr-1" />
+                                    Priorité: {getPriorityIcon(filters.priority)} {filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1)}
                                 </span>
                             )}
                             {filters.status && (
@@ -410,6 +404,12 @@ const TaskFilters = ({
                                             <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(task)}`}>
                                                 {getStatusText(task)}
                                             </span>
+                                            {/* Badge de priorité */}
+                                            {task.priority && (
+                                                <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(task.priority)}`}>
+                                                    {getPriorityIcon(task.priority)} {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                                </span>
+                                            )}
                                         </div>
 
                                         {task.description && (
@@ -482,12 +482,6 @@ const TaskFilters = ({
                                                 <Calendar size={12} className="mr-1" />
                                                 {formatDate(task.due_date)}
                                             </div>
-                                            {task.sprint && (
-                                                <div className="flex items-center">
-                                                    <span className="mr-1">🏃</span>
-                                                    Sprint: {task.sprint}
-                                                </div>
-                                            )}
                                             {task.percent_completion > 0 && task.percent_completion < 100 && (
                                                 <div className="flex items-center">
                                                     <Clock size={12} className="mr-1" />

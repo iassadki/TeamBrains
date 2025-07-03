@@ -3,13 +3,12 @@ import { NavLink } from 'react-router-dom';
 import logo from "../assets/logo_teambrains.svg";
 import { CircleUserRound, Menu, X, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import { useNavigate } from 'react-router-dom';
+import GlobalSearch from './GlobalSearch';
 
-const NavBar = ({ 
-    openSignInModal, 
-    openSignUpModal, 
-    closeModals 
-}) => {
+const NavBar = () => {
+    const { openSignInModal, openSignUpModal, closeModals } = useModal();
     // États pour gérer les différents éléments interactifs
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -69,11 +68,7 @@ const NavBar = ({
 
                 {/* Barre de recherche - visible uniquement sur les écrans moyens et grands */}
                 <div className="hidden md:flex flex-1 mx-4">
-                    <input
-                        type="text"
-                        placeholder="Rechercher..."
-                        className="text-xs w-3/4 p-2 rounded bg-gray-100"
-                    />
+                    <GlobalSearch />
                 </div>
 
                 {/* Liens de navigation - visibles sur les écrans moyens et grands */}
@@ -99,13 +94,7 @@ const NavBar = ({
                     }>
                         Contact
                     </NavLink>
-                    <NavLink to="/tarifs" className={({ isActive }) =>
-                        isActive
-                            ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
-                            : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
-                    }>
-                        Tarifs
-                    </NavLink>
+
                     {currentUser ? (
                         <div ref={dropdownRef} className="relative">
                             <button
@@ -183,11 +172,7 @@ const NavBar = ({
             {/* Barre de recherche mobile - affichée conditionnellement */}
             {isSearchOpen && (
                 <div className="md:hidden pt-2 pb-2 px-4">
-                    <input
-                        type="text"
-                        placeholder="Rechercher..."
-                        className="text-xs w-full p-2 rounded bg-gray-100"
-                    />
+                    <GlobalSearch isMobile={true} onClose={() => setIsSearchOpen(false)} />
                 </div>
             )}
 
@@ -231,17 +216,7 @@ const NavBar = ({
                         >
                             Contact
                         </NavLink>
-                        <NavLink
-                            to="/tarifs"
-                            className={({ isActive }) =>
-                                isActive
-                                    ? "text-green-tb px-4 py-2 rounded-md text-sm font-medium"
-                                    : "text-gray-700 hover:text-green-tb px-4 py-2 rounded-md text-sm font-medium"
-                            }
-                            onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                            Tarifs
-                        </NavLink>
+
                         {currentUser ? (
                             <>
                                 <NavLink

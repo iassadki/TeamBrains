@@ -1,8 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
+// Composants Profile
+import ProfileHeader from './Profile/ProfileHeader';
+import PersonalInfoSection from './Profile/PersonalInfoSection';
+import SocialLinksSection from './Profile/SocialLinksSection';
+import TechnicalSkillsSection from './Profile/TechnicalSkillsSection';
+// import SkillsManagementSection from './Profile/SkillsManagementSection';
+import ObjectivesSection from './Profile/ObjectivesSection';
+import EducationSection from './Profile/EducationSection';
+import ProjectsSection from './Profile/ProjectsSection';
+import ActionButtons from './Profile/ActionButtons';
+import DangerZone from './Profile/DangerZone';
+
+// Modals
+import DeleteAccountModal from './Profile/Modals/DeleteAccountModal';
+import ProjectDetailsModal from './Profile/Modals/ProjectDetailsModal';
 
 const Profile = () => {
+    // États principaux
     const [userInfo, setUserInfo] = useState({
         prenom: '',
         nom: '',
@@ -21,11 +39,21 @@ const Profile = () => {
     });
 
     const [cvProjects, setCvProjects] = useState([]);
+
+    // États de contrôle
     const [originalUserInfo, setOriginalUserInfo] = useState({});
     const [originalCvProfile, setOriginalCvProfile] = useState({});
     const [isEditable, setIsEditable] = useState(false);
-    const { currentUser } = useAuth();
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [selectedProjectId, setSelectedProjectId] = useState(null);
+    const [showProjectModal, setShowProjectModal] = useState(false);
 
+    // Hooks
+    const { currentUser, logout } = useAuth();
+    const navigate = useNavigate();
+
+    // Chargement des données
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -62,12 +90,45 @@ const Profile = () => {
             }
         };
 
-        fetchData();
+        if (currentUser) {
+            fetchData();
+        }
     }, [currentUser]);
 
-    const handleEdit = () => {
-        setIsEditable(true);
+    // Fonctions utilitaires
+    const displayRole = (role) => {
+        if (role === 'businessman') return 'Entrepreneur';
+        if (role === 'student') return 'Étudiant';
+        return role;
     };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'En cours';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
+    };
+
+    const getTaskStatusColor = (percentCompletion) => {
+        if (percentCompletion === 100) return 'bg-green-100 text-green-800';
+        if (percentCompletion >= 50) return 'bg-yellow-100 text-yellow-800';
+        if (percentCompletion > 0) return 'bg-blue-100 text-blue-800';
+        return 'bg-gray-100 text-gray-800';
+    };
+
+    const getTaskStatusLabel = (percentCompletion) => {
+        if (percentCompletion === 100) return 'Terminée';
+        if (percentCompletion >= 50) return 'En cours';
+        if (percentCompletion > 0) return 'Démarrée';
+        return 'À faire';
+    };
+
+    const normalizeUrl = (url) => {
+        if (!url) return '';
+        return url.replace(/^https?:\/\//, '');
+    };
+
+    // Gestionnaires d'événements
+    const handleEdit = () => setIsEditable(true);
 
     const handleCancel = () => {
         setUserInfo(originalUserInfo);
@@ -102,52 +163,27 @@ const Profile = () => {
         }
     };
 
-    const displayRole = (role) => {
-        if (role === 'businessman') {
-            return 'Entrepreneur';
-        } else if (role === 'student') {
-            return 'Étudiant';
-        }
-        return role;
+    const handleProjectClick = (projectId) => {
+        setSelectedProjectId(projectId);
+        setShowProjectModal(true);
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'En cours';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
-    };
+    const handleProjectVisibilityChange = (cvProjectId, isVisible) => {
+        // Mettre à jour l'état local des projets CV
+        setCvProjects(prevProjects =>
+            prevProjects.map(project =>
+                project.id === cvProjectId
+                    ? { ...project, is_visible: isVisible }
+                    : project
+            )
+        );
 
-    const getTaskStatusColor = (percentCompletion) => {
-        if (percentCompletion === 100) return 'bg-green-100 text-green-800';
-        if (percentCompletion >= 50) return 'bg-yellow-100 text-yellow-800';
-        if (percentCompletion > 0) return 'bg-blue-100 text-blue-800';
-        return 'bg-gray-100 text-gray-800';
-    };
-
-    const getTaskStatusLabel = (percentCompletion) => {
-        if (percentCompletion === 100) return 'Terminée';
-        if (percentCompletion >= 50) return 'En cours';
-        if (percentCompletion > 0) return 'Démarrée';
-        return 'À faire';
-    };
-
-    const normalizeUrl = (url) => {
-        if (!url) return '';
-        // Retirer le protocole s'il existe déjà pour éviter les doublons
-        let cleanUrl = url.replace(/^https?:\/\//, '');
-        return cleanUrl;
+        console.log(`Projet CV ${cvProjectId} mis à jour: ${isVisible ? 'visible' : 'masqué'}`);
     };
 
     const handleUrlChange = (field, value) => {
         const normalizedValue = normalizeUrl(value);
         setCvProfile({ ...cvProfile, [field]: normalizedValue });
-    };
-
-    const technologies = {
-        FrontEnd: ["HTML", "CSS", "JavaScript", "React", "Vue"],
-        BackEnd: ["Node.js", "Python", "Java", "PHP", "Ruby", "MongoDB", "SQL"],
-        FullStack: ["HTML", "CSS", "JavaScript", "Node.js", "React", "MongoDB", "SQL", "Ruby", "PHP", "Java", "Python", "Vue"],
-        Designer: ["Figma", "Sketch", "Adobe XD", "Photoshop", "Illustrator"],
     };
 
     const handleSelectTech = (tech) => {
@@ -158,310 +194,140 @@ const Profile = () => {
         setUserInfo({ ...userInfo, technologies: newSelectedTechs });
     };
 
-    const techsToDisplay = technologies[userInfo.typeDeveloppeur] || [];
+    const handleDeleteAccount = async () => {
+        if (!deletePassword) {
+            alert('Veuillez entrer votre mot de passe pour confirmer la suppression.');
+            return;
+        }
+
+        if (!window.confirm('Êtes-vous absolument sûr de vouloir supprimer votre compte ? Cette action est irréversible et toutes vos données seront définitivement supprimées.')) {
+            return;
+        }
+
+        try {
+            const response = await axios.delete('http://localhost:5001/users/delete_account', {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                },
+                data: { password: deletePassword }
+            });
+
+            if (response.status === 200) {
+                alert(response.data.message || 'Votre compte a été traité avec succès. Vous allez être déconnecté.');
+                logout();
+                navigate('/');
+            }
+        } catch (error) {
+            if (error.response?.data?.message) {
+                alert(`Erreur: ${error.response.data.message}`);
+            } else {
+                alert('Erreur lors de la suppression du compte. Veuillez réessayer.');
+            }
+            console.error("Erreur lors de la suppression du compte", error);
+        }
+    };
+
+    const handleCloseDeleteModal = () => {
+        setShowDeleteModal(false);
+        setDeletePassword('');
+    };
 
     return (
-        <div className="max-w-6xl mx-auto mt-10 p-8 bg-white shadow-lg rounded-lg mb-10">
-            {/* En-tête du CV */}
-            <div className="border-b-2 border-green-600 pb-6 mb-8">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-4xl font-bold text-gray-800 mb-2">
-                            {userInfo.prenom} {userInfo.nom}
-                        </h1>
-                        <p className="text-xl text-green-600 font-semibold mb-2">
-                            {displayRole(userInfo.role)} {userInfo.typeDeveloppeur && `• ${userInfo.typeDeveloppeur}`}
-                        </p>
-                        <p className="text-gray-600">{userInfo.email}</p>
-                        
-                        {/* Liens sociaux */}
-                        <div className="flex space-x-4 mt-3">
-                            {cvProfile.linkedin_url && (
-                                <a href={cvProfile.linkedin_url.startsWith('http') ? cvProfile.linkedin_url : `https://${cvProfile.linkedin_url}`} 
-                                   target="_blank" rel="noopener noreferrer" 
-                                   className="text-blue-600 hover:text-blue-800">
-                                    LinkedIn
-                                </a>
-                            )}
-                            {cvProfile.portfolio_url && (
-                                <a href={cvProfile.portfolio_url.startsWith('http') ? cvProfile.portfolio_url : `https://${cvProfile.portfolio_url}`} 
-                                   target="_blank" rel="noopener noreferrer" 
-                                   className="text-purple-600 hover:text-purple-800">
-                                    Portfolio
-                                </a>
-                            )}
-                            {cvProfile.github_url && (
-                                <a href={cvProfile.github_url.startsWith('http') ? cvProfile.github_url : `https://${cvProfile.github_url}`} 
-                                   target="_blank" rel="noopener noreferrer" 
-                                   className="text-gray-800 hover:text-gray-600">
-                                    GitHub
-                                </a>
-                            )}
-                        </div>
-                    </div>
-                    
-                    {!isEditable && (
-                        <button
-                            type="button"
-                            onClick={handleEdit}
-                            className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                        >
-                            Modifier le CV
-                        </button>
-                    )}
-                </div>
-            </div>
+        <>
+            <div className="max-w-6xl mx-auto mt-10 p-8 bg-white shadow-lg rounded-lg mb-10">
+                {/* En-tête du CV */}
+                <ProfileHeader
+                    userInfo={userInfo}
+                    cvProfile={cvProfile}
+                    isEditable={isEditable}
+                    onEdit={handleEdit}
+                    displayRole={displayRole}
+                />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Colonne de gauche */}
-                <div className="lg:col-span-1 space-y-6">
-                    {/* Informations personnelles */}
-                    <div className="bg-gray-50 p-6 rounded-lg">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Informations</h2>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Prénom</label>
-                                <input
-                                    type="text"
-                                    value={userInfo.prenom}
-                                    onChange={(e) => setUserInfo({ ...userInfo, prenom: e.target.value })}
-                                    disabled={!isEditable}
-                                    className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm ${isEditable ? "focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" : "bg-gray-100"} px-3 py-2`}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Nom</label>
-                                <input
-                                    type="text"
-                                    value={userInfo.nom}
-                                    onChange={(e) => setUserInfo({ ...userInfo, nom: e.target.value })}
-                                    disabled={!isEditable}
-                                    className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm ${isEditable ? "focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" : "bg-gray-100"} px-3 py-2`}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Email</label>
-                                <input
-                                    type="text"
-                                    value={userInfo.email}
-                                    disabled={!isEditable}
-                                    className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm ${isEditable ? "focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" : "bg-gray-100"} px-3 py-2`}
-                                />
-                            </div>
-                        </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Colonne de gauche */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <PersonalInfoSection
+                            userInfo={userInfo}
+                            setUserInfo={setUserInfo}
+                            isEditable={isEditable}
+                        />
+
+                        <SocialLinksSection
+                            cvProfile={cvProfile}
+                            handleUrlChange={handleUrlChange}
+                            isEditable={isEditable}
+                        />
+
+                        <TechnicalSkillsSection
+                            userInfo={userInfo}
+                            setUserInfo={setUserInfo}
+                            isEditable={isEditable}
+                            handleSelectTech={handleSelectTech}
+                        />
+
+                        {/* Nouvelle section de gestion des compétences - COMMENTÉE */}
+                        {/* <SkillsManagementSection
+                            userInfo={userInfo}
+                        /> */}
                     </div>
 
-                    {/* Liens */}
-                    <div className="bg-gray-50 p-6 rounded-lg">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Liens</h2>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">LinkedIn</label>
-                                <div className="mt-1 flex rounded-md shadow-sm">
-                                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                                        https://
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={cvProfile.linkedin_url}
-                                        onChange={(e) => handleUrlChange('linkedin_url', e.target.value)}
-                                        disabled={!isEditable}
-                                        placeholder="linkedin.com/in/votre-profil"
-                                        className={`flex-1 rounded-none rounded-r-md border-gray-300 ${isEditable ? "focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" : "bg-gray-100"} px-3 py-2`}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Portfolio</label>
-                                <div className="mt-1 flex rounded-md shadow-sm">
-                                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                                        https://
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={cvProfile.portfolio_url}
-                                        onChange={(e) => handleUrlChange('portfolio_url', e.target.value)}
-                                        disabled={!isEditable}
-                                        placeholder="votre-portfolio.com"
-                                        className={`flex-1 rounded-none rounded-r-md border-gray-300 ${isEditable ? "focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" : "bg-gray-100"} px-3 py-2`}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">GitHub</label>
-                                <div className="mt-1 flex rounded-md shadow-sm">
-                                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                                        https://
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={cvProfile.github_url}
-                                        onChange={(e) => handleUrlChange('github_url', e.target.value)}
-                                        disabled={!isEditable}
-                                        placeholder="github.com/votre-username"
-                                        className={`flex-1 rounded-none rounded-r-md border-gray-300 ${isEditable ? "focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" : "bg-gray-100"} px-3 py-2`}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    {/* Colonne de droite */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <ObjectivesSection
+                            cvProfile={cvProfile}
+                            setCvProfile={setCvProfile}
+                            isEditable={isEditable}
+                        />
 
-                    {/* Technologies */}
-                    {userInfo.role !== 'businessman' && (
-                        <div className="bg-gray-50 p-6 rounded-lg">
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">Compétences Techniques</h2>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Type de développeur</label>
-                                {isEditable ? (
-                                    <select
-                                        value={userInfo.typeDeveloppeur}
-                                        onChange={(e) => setUserInfo({ ...userInfo, typeDeveloppeur: e.target.value })}
-                                        className="mb-4 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 px-3 py-2"
-                                    >
-                                        <option value="FrontEnd">FrontEnd</option>
-                                        <option value="BackEnd">BackEnd</option>
-                                        <option value="FullStack">FullStack</option>
-                                        <option value="Designer">Designer</option>
-                                    </select>
-                                ) : (
-                                    <p className="mb-4 text-gray-700 font-medium">{userInfo.typeDeveloppeur}</p>
-                                )}
-                                
-                                <div className="flex flex-wrap gap-2">
-                                    {techsToDisplay.map((tech, index) => (
-                                        <span
-                                            key={index}
-                                            className={`px-3 py-1 rounded-full text-sm font-medium cursor-pointer transition-colors ${
-                                                userInfo.technologies.includes(tech) 
-                                                ? 'bg-green-500 text-white' 
-                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                            } ${isEditable ? 'hover:shadow-md' : 'cursor-default'}`}
-                                            onClick={() => handleSelectTech(tech)}
-                                        >
-                                            {tech}
-                                        </span>
-                                    ))}
-                                </div>
-                                {isEditable && <p className="text-sm text-gray-500 mt-2">Cliquez sur les technologies pour les ajouter ou les supprimer.</p>}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                        <EducationSection
+                            cvProfile={cvProfile}
+                            setCvProfile={setCvProfile}
+                            isEditable={isEditable}
+                        />
 
-                {/* Colonne de droite */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Ambitions */}
-                    <div className="bg-white border border-gray-200 p-6 rounded-lg">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Objectifs Professionnels</h2>
-                        <textarea
-                            value={cvProfile.ambitions}
-                            onChange={(e) => setCvProfile({ ...cvProfile, ambitions: e.target.value })}
-                            disabled={!isEditable}
-                            placeholder="Décrivez vos ambitions et objectifs de carrière..."
-                            rows={4}
-                            className={`w-full rounded-md border-gray-300 shadow-sm ${isEditable ? "focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" : "bg-gray-100"} px-3 py-2`}
+                        <ProjectsSection
+                            cvProjects={cvProjects}
+                            handleProjectClick={handleProjectClick}
+                            formatDate={formatDate}
+                            getTaskStatusColor={getTaskStatusColor}
+                            getTaskStatusLabel={getTaskStatusLabel}
+                            onProjectVisibilityChange={handleProjectVisibilityChange}
                         />
                     </div>
-
-                    {/* Études */}
-                    <div className="bg-white border border-gray-200 p-6 rounded-lg">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Formation</h2>
-                        <textarea
-                            value={cvProfile.etudes}
-                            onChange={(e) => setCvProfile({ ...cvProfile, etudes: e.target.value })}
-                            disabled={!isEditable}
-                            placeholder="Décrivez votre parcours éducatif..."
-                            rows={4}
-                            className={`w-full rounded-md border-gray-300 shadow-sm ${isEditable ? "focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" : "bg-gray-100"} px-3 py-2`}
-                        />
-                    </div>
-
-                    {/* Projets */}
-                    <div className="bg-white border border-gray-200 p-6 rounded-lg">
-                        <h2 className="text-xl font-bold text-gray-800 mb-6">Expérience Projets</h2>
-                        {cvProjects.length > 0 ? (
-                            <div className="space-y-4">
-                                {cvProjects.map((project) => (
-                                    <div key={project.id} className="border border-gray-200 p-4 rounded-lg bg-gray-50">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h3 className="text-lg font-semibold text-gray-800">{project.project_name}</h3>
-                                            <span className="text-sm text-gray-500">
-                                                {formatDate(project.start_date)} - {formatDate(project.end_date)}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center space-x-4 mb-2">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                {project.role}
-                                            </span>
-                                            <span className="text-sm text-gray-600">
-                                                Équipe de {project.team_size} personne{project.team_size > 1 ? 's' : ''}
-                                            </span>
-                                        </div>
-                                        {project.description && (
-                                            <p className="text-gray-700 text-sm mb-3">{project.description}</p>
-                                        )}
-                                        
-                                        {/* Tâches de l'utilisateur */}
-                                        {project.tasks && project.tasks.length > 0 && (
-                                            <div className="mt-3">
-                                                <h4 className="text-sm font-semibold text-gray-800 mb-2">Mes tâches ({project.tasks.length})</h4>
-                                                <div className="space-y-2">
-                                                    {project.tasks.map((task) => (
-                                                        <div key={task.id} className="flex items-center justify-between py-1 px-2 bg-white rounded border border-gray-100">
-                                                            <div className="flex-1">
-                                                                <p className="text-sm font-medium text-gray-800">{task.title}</p>
-                                                                {task.description && (
-                                                                    <p className="text-xs text-gray-600 mt-1">{task.description}</p>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center space-x-2 ml-3">
-                                                                <span className="text-xs text-gray-500">
-                                                                    {task.percent_completion}%
-                                                                </span>
-                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getTaskStatusColor(task.percent_completion)}`}>
-                                                                    {getTaskStatusLabel(task.percent_completion)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-8">
-                                <p className="text-gray-500">Aucun projet TeamBrains dans votre CV pour le moment.</p>
-                                <p className="text-sm text-gray-400 mt-2">
-                                    Rejoignez des projets pour enrichir automatiquement votre CV !
-                                </p>
-                            </div>
-                        )}
-                    </div>
                 </div>
+
+                {/* Boutons d'action */}
+                <ActionButtons
+                    isEditable={isEditable}
+                    onCancel={handleCancel}
+                    onSave={handleSave}
+                />
+
+                {/* Zone de danger */}
+                <DangerZone
+                    isEditable={isEditable}
+                    onShowDeleteModal={() => setShowDeleteModal(true)}
+                />
+
+                {/* Modal de suppression */}
+                <DeleteAccountModal
+                    isOpen={showDeleteModal}
+                    deletePassword={deletePassword}
+                    setDeletePassword={setDeletePassword}
+                    onConfirm={handleDeleteAccount}
+                    onCancel={handleCloseDeleteModal}
+                />
             </div>
 
-            {/* Boutons d'action */}
-            {isEditable && (
-                <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
-                    <button
-                        type="button"
-                        onClick={handleCancel}
-                        className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                        Annuler
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    >
-                        Enregistrer les modifications
-                    </button>
-                </div>
-            )}
-        </div>
+            {/* Modal de détails du projet */}
+            <ProjectDetailsModal
+                isOpen={showProjectModal}
+                onClose={() => setShowProjectModal(false)}
+                projectId={selectedProjectId}
+            />
+        </>
     );
 };
 

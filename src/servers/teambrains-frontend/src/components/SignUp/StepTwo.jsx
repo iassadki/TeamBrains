@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const StepTwo = ({ nextStep, prevStep, handleChange, values, submitForm, personType }) => {
+const StepTwo = ({ nextStep, prevStep, handleChange, values, submitForm, personType, schoolData }) => {
 
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -41,6 +41,16 @@ const StepTwo = ({ nextStep, prevStep, handleChange, values, submitForm, personT
               <span className='ml-2 rounded p-1 bg-gray-200 text-xs'>ÉTAPE 1/3</span>
             )}
           </h3>
+          
+          {schoolData && schoolData.school && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-medium text-blue-900">🎓 Inscription via école partenaire</h4>
+              <p className="text-sm text-blue-700">École : {schoolData.school.name}</p>
+              {schoolData.school.description && (
+                <p className="text-xs text-blue-600 mt-1">{schoolData.school.description}</p>
+              )}
+            </div>
+          )}
           
           {errorMessage && (
             <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Mail, Code, ExternalLink } from 'lucide-react';
+import { Eye, Mail, Code, ExternalLink, FileText } from 'lucide-react';
 
 const StudentList = ({ students, onViewCV }) => {
     const getTechBadgeColor = (tech) => {
@@ -71,10 +71,10 @@ const StudentList = ({ students, onViewCV }) => {
                             </div>
                             <button
                                 onClick={() => onViewCV(student.id)}
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                title="Voir le CV"
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Consulter le CV (lecture seule)"
                             >
-                                <Eye className="h-5 w-5" />
+                                <FileText className="h-5 w-5" />
                             </button>
                         </div>
 
@@ -159,14 +159,18 @@ const StudentList = ({ students, onViewCV }) => {
                             )}
                         </div>
 
-                        {/* Bouton CV */}
-                        <div className="mt-4 pt-3 border-t border-gray-100">
+                        {/* Boutons d'action */}
+                        <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
                             <button
                                 onClick={() => onViewCV(student.id)}
-                                className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                                className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2"
                             >
-                                Voir le CV complet
+                                <FileText className="h-4 w-4" />
+                                <span>Consulter le CV</span>
                             </button>
+                            <p className="text-xs text-gray-500 text-center">
+                                Consultation en lecture seule
+                            </p>
                         </div>
                     </div>
                 ))}
