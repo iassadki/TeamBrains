@@ -136,7 +136,7 @@ def stripe_partnership_webhook():
     
     # Mode Docker/développement avec secret fixe
     if not endpoint_secret:
-        endpoint_secret = 'whsec_partnership_dev_fixed_secret_456'
+        endpoint_secret = 'whsec_b016ddbd5e1935ad4341f95c1ac10d848b86d1b2c4c3555a1971bc473f761e71'
         logging.info("🐋 Utilisation du secret webhook partenariat Docker fixe")
     
     if not endpoint_secret:
@@ -420,46 +420,7 @@ def handle_partnership_subscription_deleted(stripe_subscription):
     except Exception as e:
         logging.error(f"Erreur suppression abonnement partenariat: {str(e)}")
 
-@stripe_partnership_bp.route('/test/sync-subscription', methods=['POST'])
-@jwt_required()
-def sync_subscription_from_stripe():
-    """Synchroniser un abonnement depuis Stripe (pour debug) - CORRIGÉ"""
-    try:
-        user_id = get_jwt_identity()
-        user = User.query.get(user_id)
-        
-        if not user or user.role != 'school_admin':
-            return jsonify({'error': 'Accès non autorisé'}), 403
-        
-        data = request.get_json()
-        session_id = data.get('session_id')
-        
-        if not session_id:
-            return jsonify({'error': 'session_id requis'}), 400
-        
-        # Récupérer la session depuis Stripe
-        try:
-            session = stripe.checkout.Session.retrieve(session_id)
-            logging.info(f"🔍 Session récupérée: {session.id}")
-        except stripe.error.StripeError as e:
-            return jsonify({'error': f'Session Stripe non trouvée: {str(e)}'}), 404
-        
-        # Traiter manuellement la session comme si le webhook avait été appelé
-        handle_partnership_checkout_completed(session)
-        
-        return jsonify({
-            'message': 'Synchronisation effectuée avec succès',
-            'session_id': session_id,
-            'subscription_id': session.get('subscription'),
-            'customer_id': session.get('customer'),
-            'metadata': session.get('metadata', {})
-        }), 200
-        
-    except Exception as e:
-        logging.error(f"Erreur sync abonnement: {str(e)}")
-        import traceback
-        logging.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({'error': 'Erreur lors de la synchronisation'}), 500
+
 
 @stripe_partnership_bp.route('/force-sync-all', methods=['POST'])
 @jwt_required()
@@ -774,57 +735,7 @@ def create_billing_portal():
         logging.error(f"Erreur création portail facturation: {str(e)}")
         return jsonify({'error': 'Erreur lors de la création du portail de facturation'}), 500
 
-@stripe_partnership_bp.route('/test/create-subscription', methods=['POST'])
-@jwt_required()
-def create_test_subscription():
-    """Endpoint de test pour créer un abonnement sans passer par Stripe"""
-    try:
-        user_id = get_jwt_identity()
-        user = User.query.get(user_id)
-        
-        if not user or user.role != 'school_admin' or not user.school_id:
-            return jsonify({'error': 'Accès non autorisé'}), 403
-        
-        # Vérifier s'il existe déjà un abonnement
-        existing_sub = Subscription.query.filter_by(school_id=user.school_id).first()
-        if existing_sub:
-            return jsonify({'error': 'Un abonnement existe déjà pour cette école'}), 400
-        
-        data = request.get_json() or {}
-        student_count = data.get('student_count', 10)
-        
-        # Créer l'abonnement de test
-        subscription = Subscription()
-        subscription.user_id = user.id
-        subscription.school_id = user.school_id
-        subscription.stripe_subscription_id = f"sub_test_{user.school_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
-        subscription.stripe_customer_id = f"cus_test_{user.school_id}"
-        subscription.plan_type = 'school_partnership'
-        subscription.status = 'active'
-        
-        # Dates
-        now = datetime.utcnow()
-        subscription.current_period_start = now
-        subscription.current_period_end = now + timedelta(days=30)
-        
-        # Paramètres spécifiques au plan partenariat
-        subscription.current_student_count = student_count
-        subscription.student_price_per_month = 500  # 5€ en centimes
-        subscription.total_monthly_amount = student_count * 500
-        subscription.last_student_count_update = now
-        
-        # Sauvegarder
-        db.session.add(subscription)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Abonnement de test créé avec succès',
-            'subscription': subscription.to_dict()
-        })
-        
-    except Exception as e:
-        logging.error(f"Erreur création abonnement test: {str(e)}")
-        return jsonify({'error': 'Erreur lors de la création de l\'abonnement de test'}), 500
+
 
 @stripe_partnership_bp.route('/sync-subscription', methods=['POST'])
 @jwt_required()
